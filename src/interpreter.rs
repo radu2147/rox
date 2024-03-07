@@ -6,17 +6,16 @@ use crate::environment::Environment;
 use crate::expression_visitor::Visitor;
 use crate::statement_visitor::StatementVisitor;
 use crate::stmt::{
-    BlockStatement, ExpressionStatement, FunctionDeclaration, IfStatement, PrintStatement, Stmt,
-    VariableDeclarationStatement, WhileStatement,
+    BlockStatement, ExpressionStatement, FunctionDeclaration, IfStatement, PrintStatement,
+    ReturnStatement, Stmt, VariableDeclarationStatement, WhileStatement,
 };
-use std::cell::RefCell;
 use std::fmt::Display;
 use std::ops::Add;
-use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct RunTimeError {
     pub message: String,
+    pub return_error: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -55,8 +54,19 @@ impl Callable {
         }
         match self.body {
             Some(ref mut bd) => {
-                bd.accept(int, &mut env)?;
-                Ok(Value::Nil)
+                let rez = bd.accept(int, &mut env);
+                match rez {
+                    Ok(()) => Ok(Value::Nil),
+                    Err(e) => {
+                        if e.return_error {
+                            let return_value = int.ret_val.clone();
+                            int.ret_val = Value::Nil;
+                            Ok(return_value)
+                        } else {
+                            Err(e)
+                        }
+                    }
+                }
             }
             None => {
                 return match self.std_call {
@@ -109,6 +119,7 @@ impl Value {
             _ => {
                 return Err(RunTimeError {
                     message: format!("Value {self} is not a number").to_string(),
+                    return_error: false,
                 });
             }
         }
@@ -122,6 +133,7 @@ impl Value {
             _ => {
                 return Err(RunTimeError {
                     message: format!("Value {self} is not a string").to_string(),
+                    return_error: false,
                 });
             }
         }
@@ -135,6 +147,7 @@ impl Value {
             _ => {
                 return Err(RunTimeError {
                     message: format!("Value {self} is not a bool").to_string(),
+                    return_error: false,
                 })
             }
         }
@@ -148,7 +161,9 @@ impl Value {
     }
 }
 
-pub struct Interpreter {}
+pub struct Interpreter {
+    pub ret_val: Value,
+}
 
 impl Interpreter {
     pub fn interpret(
@@ -198,6 +213,23 @@ impl StatementVisitor<(), RunTimeError> for Interpreter {
             ))),
         );
         Ok(())
+    }
+
+    fn visit_return_statement(
+        &mut self,
+        return_stmt: &mut ReturnStatement,
+        env: &mut Environment,
+    ) -> Result<(), RunTimeError> {
+        let value = return_stmt
+            .return_expression
+            .clone()
+            .unwrap()
+            .accept(self, env)?;
+        self.ret_val = value;
+        Err(RunTimeError {
+            message: "".to_string(),
+            return_error: true,
+        })
     }
 
     fn visit_while_statement(
@@ -268,7 +300,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
         if let Value::Callable(mut callable) = callable {
             let mut args = Vec::new();
             for arg in &expr.arguments {
-                args.push(arg.accept_immutable(self, env)?);
+                args.push(arg.accept(self, env)?);
             }
 
             if args.len() != callable.arity as usize {
@@ -279,6 +311,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                         args.len()
                     )
                     .to_string(),
+                    return_error: false,
                 });
             }
 
@@ -286,6 +319,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
         }
         return Err(RunTimeError {
             message: "Expression not callable".to_string(),
+            return_error: false,
         });
     }
 
@@ -332,6 +366,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                     _ => Err(RunTimeError {
                         message: "Cannot add 2 values that are not both strings or numbers"
                             .to_string(),
+                        return_error: false,
                     }),
                 };
             }
@@ -403,7 +438,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                         Ok(Value::Bool(nr >= value_right.get_number()?.clone()))
                     },
                     _ => {
-                        Err(RunTimeError {message: format!("Cannot compare {value_left} with {value_right}. One of them is not a number")})
+                        Err(RunTimeError {message: format!("Cannot compare {value_left} with {value_right}. One of them is not a number"), return_error: false})
                     }
                 };
             }
@@ -419,7 +454,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                         Ok(Value::Bool(nr <= value_right.get_number()?.clone()))
                     },
                     _ => {
-                        Err(RunTimeError {message: format!("Cannot compare {value_left} with {value_right}. One of them is not a number")})
+                        Err(RunTimeError {message: format!("Cannot compare {value_left} with {value_right}. One of them is not a number"), return_error: false})
                     }
                 };
             }
@@ -435,7 +470,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                         Ok(Value::Bool(nr < value_right.get_number()?.clone()))
                     },
                     _ => {
-                        Err(RunTimeError {message: format!("Cannot compare {value_left} with {value_right}. One of them is not a number")})
+                        Err(RunTimeError {message: format!("Cannot compare {value_left} with {value_right}. One of them is not a number"), return_error: false})
                     }
                 };
             }
@@ -451,7 +486,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                         Ok(Value::Bool(nr > value_right.get_number()?.clone()))
                     },
                     _ => {
-                        Err(RunTimeError {message: format!("Cannot compare {value_left} with {value_right}. One of them is not a number")})
+                        Err(RunTimeError {message: format!("Cannot compare {value_left} with {value_right}. One of them is not a number"), return_error: false})
                     }
                 };
             }
@@ -485,6 +520,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                         "Operator {:?} is not a valid operator for a binary expression",
                         expr.operator
                     ),
+                    return_error: false,
                 })
             }
         }
@@ -521,6 +557,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                     "Operator {:?} is not a valid operator for a unary expression",
                     expr.operator
                 ),
+                return_error: false,
             }),
         };
     }

@@ -73,6 +73,7 @@ impl Environment {
 
         Err(RunTimeError {
             message: format!("Undefined variable {name}").to_string(),
+            return_error: false,
         })
     }
 
@@ -84,7 +85,7 @@ impl Environment {
             }
             if node_it.borrow().parent.is_some() {
                 node_it = {
-                    let c = node_it.borrow().parent.clone().unwrap().clone();
+                    let c = node_it.borrow().parent.clone().unwrap();
                     c
                 };
             } else {
@@ -94,6 +95,7 @@ impl Environment {
 
         Err(RunTimeError {
             message: format!("Undefined variable {name}").to_string(),
+            return_error: false,
         })
     }
 

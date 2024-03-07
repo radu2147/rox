@@ -3,8 +3,8 @@ use crate::ast_types::{
     Identifier, Operator, UnaryExpression,
 };
 use crate::stmt::{
-    BlockStatement, ExpressionStatement, FunctionDeclaration, IfStatement, PrintStatement, Stmt,
-    VariableDeclarationStatement, WhileStatement,
+    BlockStatement, ExpressionStatement, FunctionDeclaration, IfStatement, PrintStatement,
+    ReturnStatement, Stmt, VariableDeclarationStatement, WhileStatement,
 };
 use crate::types::Token;
 use crate::ErrorHandler;
@@ -135,6 +135,27 @@ impl<'a> Parser<'a> {
                     Err(ParseError {
                         message: "; expected after a print statement".to_string(),
                     })
+                }
+            }
+            Token::Return(_, _) => {
+                self.advance();
+                if let Token::Semicolon(_, _) = self.peek() {
+                    self.advance();
+                    Ok(Stmt::ReturnStatement(ReturnStatement {
+                        return_expression: None,
+                    }))
+                } else {
+                    let expr = self.parse_expression()?;
+                    if let Token::Semicolon(_, _) = self.peek() {
+                        self.advance();
+                        Ok(Stmt::ReturnStatement(ReturnStatement {
+                            return_expression: Some(expr),
+                        }))
+                    } else {
+                        Err(ParseError {
+                            message: "; expected after a return statement".to_string(),
+                        })
+                    }
                 }
             }
             Token::LeftParen(_, _) => {

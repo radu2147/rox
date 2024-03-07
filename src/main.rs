@@ -22,7 +22,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 fn run(code: String, error_handler: &mut ErrorHandler, env: &mut Environment) {
     let mut scanner = Scanner::new(code, error_handler);
     let mut parser = Parser::new(scanner.scan_tokens(), error_handler);
-    let mut interpreter = Interpreter {};
+    let mut interpreter = Interpreter {
+        ret_val: Value::Nil,
+    };
     match parser.parse_program() {
         Ok(mut t) => match interpreter.interpret(&mut t, env) {
             Ok(_) => {}

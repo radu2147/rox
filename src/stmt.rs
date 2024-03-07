@@ -4,6 +4,7 @@ use crate::statement_visitor::StatementVisitor;
 
 #[derive(Debug, Clone)]
 pub enum Stmt {
+    ReturnStatement(ReturnStatement),
     PrintStatement(PrintStatement),
     ExpressionStatement(ExpressionStatement),
     VarDeclarationStatement(VariableDeclarationStatement),
@@ -29,6 +30,11 @@ pub struct VariableDeclarationStatement {
 #[derive(Debug, Clone)]
 pub struct PrintStatement {
     pub expression: Expression,
+}
+
+#[derive(Debug, Clone)]
+pub struct ReturnStatement {
+    pub return_expression: Option<Expression>,
 }
 
 #[derive(Debug, Clone)]
