@@ -83,14 +83,16 @@ fn main() {
         "clock".to_string(),
         Value::Callable(Callable {
             arity: 0,
-            call: |_int, _args| {
-                return Value::Number(
+            params: vec![],
+            body: None,
+            std_call: Some(|_int, _env, _args| {
+                return Ok(Value::Number(
                     SystemTime::now()
                         .duration_since(UNIX_EPOCH)
                         .unwrap()
                         .as_secs_f32(),
-                );
-            },
+                ));
+            }),
         }),
     );
     match args.len() {

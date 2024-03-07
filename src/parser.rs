@@ -50,6 +50,7 @@ impl<'a> Parser<'a> {
                         self.advance();
                         let params = self.parse_parameters()?;
                         if let Token::RightBrace(_, _) = self.peek() {
+                            self.advance();
                             let body = self.parse_stmt()?;
                             return Ok(Stmt::FunctionDeclaration(FunctionDeclaration {
                                 params,
@@ -116,9 +117,7 @@ impl<'a> Parser<'a> {
                     });
                 }
             } else {
-                return Err(ParseError {
-                    message: "Expected comma after parameter of function".to_string(),
-                });
+                break;
             }
         }
 

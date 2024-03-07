@@ -31,28 +31,50 @@ pub enum Value {
 #[derive(Debug, Clone)]
 pub struct Callable {
     pub arity: u8,
-    pub call: fn(
-        interpreter: &mut Interpreter,
-        env: &mut Environment,
-        args: Vec<Value>,
-    ) -> Result<Value, RunTimeError>,
+    pub body: Option<Stmt>,
+    pub params: Vec<Expression>,
+    pub std_call: Option<
+        fn(
+            int: &mut Interpreter,
+            env: &mut Environment,
+            args: Vec<Value>,
+        ) -> Result<Value, RunTimeError>,
+    >,
 }
 
 impl Callable {
+    pub fn call(
+        &mut self,
+        int: &mut Interpreter,
+        env: &mut Environment,
+        args: Vec<Value>,
+    ) -> Result<Value, RunTimeError> {
+        let mut env = env.extend();
+        for (ind, it) in args.iter().enumerate() {
+            env.define(self.params[ind].get_identifier_name(), it.clone());
+        }
+        match self.body {
+            Some(ref mut bd) => {
+                bd.accept(int, &mut env)?;
+                Ok(Value::Nil)
+            }
+            None => {
+                return match self.std_call {
+                    Some(fun) => Ok(fun(int, &mut env, args)?),
+                    None => Ok(Value::Nil),
+                }
+            }
+        }
+    }
     pub fn from_node(node: &mut Stmt) -> Self {
         match node {
             Stmt::FunctionDeclaration(ref mut func) => Self {
                 arity: func.params.len() as u8,
-                call: |int, env, args| {
-                    let mut env = env.extend();
-                    for (ind, it) in args.iter().enumerate() {
-                        env.define(func.params[ind].get_identifier_name(), it.clone());
-                    }
-                    func.body.accept(int, &mut env)?;
-                    return Ok(Value::Nil);
-                },
+                body: Some(*func.body.clone()),
+                params: func.params.clone(),
+                std_call: None,
             },
-            _ => panic!("Un reachable code"),
+            _ => panic!("Unreachable code"),
         }
     }
 }
@@ -169,7 +191,13 @@ impl StatementVisitor<(), RunTimeError> for Interpreter {
         func_dec: &mut FunctionDeclaration,
         env: &mut Environment,
     ) -> Result<(), RunTimeError> {
-        todo!()
+        env.define(
+            func_dec.name.clone(),
+            Value::Callable(Callable::from_node(&mut Stmt::FunctionDeclaration(
+                func_dec.clone(),
+            ))),
+        );
+        Ok(())
     }
 
     fn visit_while_statement(
@@ -237,7 +265,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
         env: &mut Environment,
     ) -> Result<Value, RunTimeError> {
         let callable = expr.callee.accept_immutable(self, env)?;
-        if let Value::Callable(callable) = callable {
+        if let Value::Callable(mut callable) = callable {
             let mut args = Vec::new();
             for arg in &expr.arguments {
                 args.push(arg.accept_immutable(self, env)?);
@@ -254,7 +282,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                 });
             }
 
-            return Ok((callable.call)(self, env, args)?);
+            return Ok(callable.call(self, env, args)?);
         }
         return Err(RunTimeError {
             message: "Expression not callable".to_string(),
