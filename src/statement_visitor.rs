@@ -41,7 +41,7 @@ pub trait StatementVisitor<V, E> {
 
     fn visit_declaration_statement(
         &mut self,
-        decl: &VariableDeclarationStatement,
+        decl: &mut VariableDeclarationStatement,
         env: &mut Environment,
     ) -> Result<V, E>;
     fn visit_block_statement(
@@ -51,12 +51,12 @@ pub trait StatementVisitor<V, E> {
     ) -> Result<V, E>;
     fn visit_statement_expression(
         &mut self,
-        expr: &ExpressionStatement,
+        expr: &mut ExpressionStatement,
         env: &mut Environment,
     ) -> Result<V, E>;
     fn visit_print_statement(
         &mut self,
-        expr: &PrintStatement,
+        expr: &mut PrintStatement,
         env: &mut Environment,
     ) -> Result<V, E>;
 }

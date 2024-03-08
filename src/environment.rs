@@ -4,6 +4,7 @@ use crate::interpreter::{RunTimeError, Value};
 use std::cell::RefCell;
 use std::rc::Rc;
 
+#[derive(Debug)]
 struct EnvNode {
     map: BTreeMap<String, Value>,
     parent: Option<Rc<RefCell<EnvNode>>>,
@@ -33,7 +34,7 @@ impl EnvNode {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Environment {
     node: Rc<RefCell<EnvNode>>,
 }

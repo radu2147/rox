@@ -100,18 +100,10 @@ impl Operator {
 
 impl Expression {
     pub fn accept<T: Visitor<V, E>, V, E>(
-        &self,
+        &mut self,
         visitor: &mut T,
         env: &mut Environment,
     ) -> Result<V, E> {
         visitor.visit_expression(self, env)
-    }
-
-    pub fn accept_immutable<T: Visitor<V, E>, V, E>(
-        &self,
-        visitor: &T,
-        env: &Environment,
-    ) -> Result<V, E> {
-        visitor.visit_immutable_expression(self, env)
     }
 }

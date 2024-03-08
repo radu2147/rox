@@ -95,6 +95,7 @@ fn main() {
                         .as_secs_f32(),
                 ));
             }),
+            closure: environment.clone(),
         }),
     );
     match args.len() {

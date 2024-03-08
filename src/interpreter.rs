@@ -32,6 +32,7 @@ pub struct Callable {
     pub arity: u8,
     pub body: Option<Stmt>,
     pub params: Vec<Expression>,
+    pub closure: Environment,
     pub std_call: Option<
         fn(
             int: &mut Interpreter,
@@ -48,7 +49,7 @@ impl Callable {
         env: &mut Environment,
         args: Vec<Value>,
     ) -> Result<Value, RunTimeError> {
-        let mut env = env.extend();
+        let mut env = self.closure.extend();
         for (ind, it) in args.iter().enumerate() {
             env.define(self.params[ind].get_identifier_name(), it.clone());
         }
@@ -76,15 +77,13 @@ impl Callable {
             }
         }
     }
-    pub fn from_node(node: &mut Stmt) -> Self {
-        match node {
-            Stmt::FunctionDeclaration(ref mut func) => Self {
-                arity: func.params.len() as u8,
-                body: Some(*func.body.clone()),
-                params: func.params.clone(),
-                std_call: None,
-            },
-            _ => panic!("Unreachable code"),
+    pub fn from_node(func: &mut FunctionDeclaration, env: Environment) -> Self {
+        Self {
+            arity: func.params.len() as u8,
+            body: Some(*func.body.clone()),
+            params: func.params.clone(),
+            std_call: None,
+            closure: env,
         }
     }
 }
@@ -184,11 +183,7 @@ impl StatementVisitor<(), RunTimeError> for Interpreter {
         if_statement: &mut IfStatement,
         env: &mut Environment,
     ) -> Result<(), RunTimeError> {
-        if if_statement
-            .expression
-            .accept_immutable(self, env)?
-            .is_truthy()
-        {
+        if if_statement.expression.accept(self, env)?.is_truthy() {
             if_statement.statement.accept(self, env)?;
         } else {
             match if_statement.else_statement {
@@ -208,9 +203,7 @@ impl StatementVisitor<(), RunTimeError> for Interpreter {
     ) -> Result<(), RunTimeError> {
         env.define(
             func_dec.name.clone(),
-            Value::Callable(Callable::from_node(&mut Stmt::FunctionDeclaration(
-                func_dec.clone(),
-            ))),
+            Value::Callable(Callable::from_node(func_dec, env.clone())),
         );
         Ok(())
     }
@@ -238,7 +231,7 @@ impl StatementVisitor<(), RunTimeError> for Interpreter {
         env: &mut Environment,
     ) -> Result<(), RunTimeError> {
         loop {
-            let cond = while_statement.expression.accept_immutable(self, env)?;
+            let cond = while_statement.expression.accept(self, env)?;
             if !cond.is_truthy() {
                 break;
             }
@@ -249,13 +242,11 @@ impl StatementVisitor<(), RunTimeError> for Interpreter {
 
     fn visit_declaration_statement(
         &mut self,
-        decl: &VariableDeclarationStatement,
+        decl: &mut VariableDeclarationStatement,
         env: &mut Environment,
     ) -> Result<(), RunTimeError> {
-        env.define(
-            decl.name.clone(),
-            decl.initializer.accept_immutable(self, env)?.clone(),
-        );
+        let init = { decl.initializer.accept(self, env)?.clone() };
+        env.define(decl.name.clone(), init);
         Ok(())
     }
 
@@ -273,7 +264,7 @@ impl StatementVisitor<(), RunTimeError> for Interpreter {
 
     fn visit_statement_expression(
         &mut self,
-        expr: &ExpressionStatement,
+        expr: &mut ExpressionStatement,
         env: &mut Environment,
     ) -> Result<(), RunTimeError> {
         expr.expression.accept(self, env)?;
@@ -282,7 +273,7 @@ impl StatementVisitor<(), RunTimeError> for Interpreter {
 
     fn visit_print_statement(
         &mut self,
-        expr: &PrintStatement,
+        expr: &mut PrintStatement,
         env: &mut Environment,
     ) -> Result<(), RunTimeError> {
         println!("{}", expr.expression.accept(self, env)?);
@@ -293,13 +284,13 @@ impl StatementVisitor<(), RunTimeError> for Interpreter {
 impl Visitor<Value, RunTimeError> for Interpreter {
     fn visit_call_expression(
         &mut self,
-        expr: &CallExpression,
+        expr: &mut CallExpression,
         env: &mut Environment,
     ) -> Result<Value, RunTimeError> {
-        let callable = expr.callee.accept_immutable(self, env)?;
+        let callable = expr.callee.accept(self, env)?;
         if let Value::Callable(mut callable) = callable {
             let mut args = Vec::new();
-            for arg in &expr.arguments {
+            for arg in &mut expr.arguments {
                 args.push(arg.accept(self, env)?);
             }
 
@@ -325,7 +316,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
 
     fn visit_assignement_expression(
         &mut self,
-        expr: &AssignmentExpression,
+        expr: &mut AssignmentExpression,
         env: &mut Environment,
     ) -> Result<Value, RunTimeError> {
         let val = expr.asignee.accept(self, env)?;
@@ -335,29 +326,21 @@ impl Visitor<Value, RunTimeError> for Interpreter {
     }
 
     fn visit_binary_expression(
-        &self,
-        expr: &BinaryExpression,
-        env: &Environment,
+        &mut self,
+        expr: &mut BinaryExpression,
+        env: &mut Environment,
     ) -> Result<Value, RunTimeError> {
         match expr.operator {
             Operator::Div => {
-                let value_left = expr
-                    .left
-                    .accept_immutable::<Self, Value, RunTimeError>(self, env);
-                let value_right = expr
-                    .right
-                    .accept_immutable::<Self, Value, RunTimeError>(self, env);
+                let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env);
+                let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env);
                 return Ok(Value::Number(
                     value_left?.get_number()? / value_right?.get_number()?,
                 ));
             }
             Operator::Plus => {
-                let value_left = expr
-                    .left
-                    .accept_immutable::<Self, Value, RunTimeError>(self, env)?;
-                let value_right = expr
-                    .right
-                    .accept_immutable::<Self, Value, RunTimeError>(self, env)?;
+                let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env)?;
+                let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
                 return match value_left {
                     Value::Number(el) => Ok(Value::Number(value_right.get_number()? + el)),
                     Value::String(st) => {
@@ -371,34 +354,22 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                 };
             }
             Operator::Minus => {
-                let value_left = expr
-                    .left
-                    .accept_immutable::<Self, Value, RunTimeError>(self, env);
-                let value_right = expr
-                    .right
-                    .accept_immutable::<Self, Value, RunTimeError>(self, env);
+                let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env);
+                let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env);
                 return Ok(Value::Number(
                     value_left?.get_number()? - value_right?.get_number()?,
                 ));
             }
             Operator::Mul => {
-                let value_left = expr
-                    .left
-                    .accept_immutable::<Self, Value, RunTimeError>(self, env);
-                let value_right = expr
-                    .right
-                    .accept_immutable::<Self, Value, RunTimeError>(self, env);
+                let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env);
+                let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env);
                 return Ok(Value::Number(
                     value_left?.get_number()? * value_right?.get_number()?,
                 ));
             }
             Operator::EQ => {
-                let value_left = expr
-                    .left
-                    .accept_immutable::<Self, Value, RunTimeError>(self, env)?;
-                let value_right = expr
-                    .right
-                    .accept_immutable::<Self, Value, RunTimeError>(self, env)?;
+                let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env)?;
+                let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
                 return match value_left {
                     Value::Number(nr) => Ok(Value::Bool(nr == value_right.get_number()?.clone())),
                     Value::String(str_l) => {
@@ -410,12 +381,8 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                 };
             }
             Operator::NotEqual => {
-                let value_left = expr
-                    .left
-                    .accept_immutable::<Self, Value, RunTimeError>(self, env)?;
-                let value_right = expr
-                    .right
-                    .accept_immutable::<Self, Value, RunTimeError>(self, env)?;
+                let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env)?;
+                let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
                 return match value_left {
                     Value::Number(nr) => Ok(Value::Bool(nr != value_right.get_number()?.clone())),
                     Value::String(str_l) => {
@@ -427,12 +394,8 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                 };
             }
             Operator::GE => {
-                let value_left = expr
-                    .left
-                    .accept_immutable::<Self, Value, RunTimeError>(self, env)?;
-                let value_right = expr
-                    .right
-                    .accept_immutable::<Self, Value, RunTimeError>(self, env)?;
+                let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env)?;
+                let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
                 return match value_left {
                     Value::Number(nr) => {
                         Ok(Value::Bool(nr >= value_right.get_number()?.clone()))
@@ -443,12 +406,8 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                 };
             }
             Operator::LE => {
-                let value_left = expr
-                    .left
-                    .accept_immutable::<Self, Value, RunTimeError>(self, env)?;
-                let value_right = expr
-                    .right
-                    .accept_immutable::<Self, Value, RunTimeError>(self, env)?;
+                let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env)?;
+                let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
                 return match value_left {
                     Value::Number(nr) => {
                         Ok(Value::Bool(nr <= value_right.get_number()?.clone()))
@@ -459,12 +418,8 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                 };
             }
             Operator::Less => {
-                let value_left = expr
-                    .left
-                    .accept_immutable::<Self, Value, RunTimeError>(self, env)?;
-                let value_right = expr
-                    .right
-                    .accept_immutable::<Self, Value, RunTimeError>(self, env)?;
+                let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env)?;
+                let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
                 return match value_left {
                     Value::Number(nr) => {
                         Ok(Value::Bool(nr < value_right.get_number()?.clone()))
@@ -475,12 +430,8 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                 };
             }
             Operator::Greater => {
-                let value_left = expr
-                    .left
-                    .accept_immutable::<Self, Value, RunTimeError>(self, env)?;
-                let value_right = expr
-                    .right
-                    .accept_immutable::<Self, Value, RunTimeError>(self, env)?;
+                let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env)?;
+                let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
                 return match value_left {
                     Value::Number(nr) => {
                         Ok(Value::Bool(nr > value_right.get_number()?.clone()))
@@ -491,27 +442,19 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                 };
             }
             Operator::And => {
-                let value_left = expr
-                    .left
-                    .accept_immutable::<Self, Value, RunTimeError>(self, env)?;
+                let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env)?;
                 if !value_left.is_truthy() {
                     return Ok(value_left);
                 }
-                let value_right = expr
-                    .right
-                    .accept_immutable::<Self, Value, RunTimeError>(self, env)?;
+                let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
                 return Ok(value_right);
             }
             Operator::Or => {
-                let value_left = expr
-                    .left
-                    .accept_immutable::<Self, Value, RunTimeError>(self, env)?;
+                let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env)?;
                 if value_left.is_truthy() {
                     return Ok(value_left);
                 }
-                let value_right = expr
-                    .right
-                    .accept_immutable::<Self, Value, RunTimeError>(self, env)?;
+                let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
                 return Ok(value_right);
             }
             _ => {
@@ -535,21 +478,21 @@ impl Visitor<Value, RunTimeError> for Interpreter {
     }
 
     fn visit_unary_expression(
-        &self,
-        expr: &UnaryExpression,
-        env: &Environment,
+        &mut self,
+        expr: &mut UnaryExpression,
+        env: &mut Environment,
     ) -> Result<Value, RunTimeError> {
         return match expr.operator {
             Operator::Not => Ok(Value::Bool(
                 !expr
                     .expression
-                    .accept_immutable::<Self, Value, RunTimeError>(self, env)?
+                    .accept::<Self, Value, RunTimeError>(self, env)?
                     .is_truthy(),
             )),
             Operator::Minus => {
                 let value = expr
                     .expression
-                    .accept_immutable::<Self, Value, RunTimeError>(self, env)?;
+                    .accept::<Self, Value, RunTimeError>(self, env)?;
                 Ok(Value::Number(-value.get_number()?.clone()))
             }
             _ => Err(RunTimeError {
@@ -563,11 +506,11 @@ impl Visitor<Value, RunTimeError> for Interpreter {
     }
 
     fn visit_group_expression(
-        &self,
-        expr: &GroupExpression,
-        env: &Environment,
+        &mut self,
+        expr: &mut GroupExpression,
+        env: &mut Environment,
     ) -> Result<Value, RunTimeError> {
-        expr.expression.accept_immutable(self, env)
+        expr.expression.accept(self, env)
     }
 
     fn visit_nil_literal(&self) -> Value {
