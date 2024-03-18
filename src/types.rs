@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Token {
     LeftParen(String, i32),
     RightParen(String, i32),
@@ -41,4 +41,22 @@ pub enum Token {
     Var(String, i32),
     While(String, i32),
     Eof(String, i32),
+}
+
+impl Token {
+    pub fn get_variable(&self) -> Variable {
+        match self {
+            Token::Identifier(name, line) => Variable {
+                name: name.clone(),
+                line: line.clone(),
+            },
+            _ => panic!("Not a variable"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Variable {
+    pub name: String,
+    pub line: i32,
 }

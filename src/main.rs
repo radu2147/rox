@@ -4,6 +4,7 @@ mod errors;
 mod expression_visitor;
 mod interpreter;
 mod parser;
+mod resolver;
 mod scanner;
 mod statement_visitor;
 mod stmt;
@@ -12,7 +13,9 @@ mod types;
 use crate::environment::Environment;
 use crate::interpreter::{Callable, Interpreter, Value};
 use crate::parser::Parser;
+use crate::resolver::Resolver;
 use crate::scanner::Scanner;
+use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::io::Write;
@@ -24,18 +27,21 @@ fn run(code: String, error_handler: &mut ErrorHandler, env: &mut Environment) {
     let mut parser = Parser::new(scanner.scan_tokens(), error_handler);
     let mut interpreter = Interpreter {
         ret_val: Value::Nil,
+        locals: HashMap::new(),
     };
+    let mut resolver = Resolver::new(&mut interpreter);
     match parser.parse_program() {
-        Ok(mut t) => match interpreter.interpret(&mut t, env) {
-            Ok(_) => {}
-            Err(e) => {
-                println!("{:?}", e);
+        Ok(mut t) => {
+            resolver.resolve(env, &mut t);
+            match interpreter.interpret(&mut t, env) {
+                Ok(_) => {}
+                Err(e) => {
+                    println!("{:?}", e);
+                }
             }
-        },
+        }
         Err(e) => println!("{:?}", e),
     }
-
-    // scanner.scan_tokens().iter().for_each(|token|println!("{:?}", token));
 }
 
 struct ErrorHandler {

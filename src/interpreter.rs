@@ -9,6 +9,8 @@ use crate::stmt::{
     BlockStatement, ExpressionStatement, FunctionDeclaration, IfStatement, PrintStatement,
     ReturnStatement, Stmt, VariableDeclarationStatement, WhileStatement,
 };
+use crate::types::{Token, Variable};
+use std::collections::HashMap;
 use std::fmt::Display;
 use std::ops::Add;
 
@@ -162,6 +164,7 @@ impl Value {
 
 pub struct Interpreter {
     pub ret_val: Value,
+    pub locals: HashMap<Variable, u32>,
 }
 
 impl Interpreter {
@@ -174,6 +177,10 @@ impl Interpreter {
             stmt.accept::<Self, (), RunTimeError>(self, env)?;
         }
         Ok(())
+    }
+
+    pub fn resolve(&mut self, expr: &Token, count: u32) {
+        self.locals.insert(expr.get_variable(), count);
     }
 }
 
@@ -320,8 +327,12 @@ impl Visitor<Value, RunTimeError> for Interpreter {
         env: &mut Environment,
     ) -> Result<Value, RunTimeError> {
         let val = expr.asignee.accept(self, env)?;
-        env.assign(expr.name.clone(), val.clone())?;
-
+        let dist = self.locals.get(&expr.name.get_variable());
+        if dist.is_some() {
+            env.assign_at(expr.name.get_variable().name, val.clone(), dist.unwrap())?;
+        } else {
+            env.assign(expr.name.get_variable().name, val.clone())?;
+        }
         Ok(val)
     }
 
@@ -330,18 +341,18 @@ impl Visitor<Value, RunTimeError> for Interpreter {
         expr: &mut BinaryExpression,
         env: &mut Environment,
     ) -> Result<Value, RunTimeError> {
-        match expr.operator {
+        return match expr.operator {
             Operator::Div => {
                 let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env);
                 let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env);
-                return Ok(Value::Number(
+                Ok(Value::Number(
                     value_left?.get_number()? / value_right?.get_number()?,
-                ));
+                ))
             }
             Operator::Plus => {
                 let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env)?;
                 let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
-                return match value_left {
+                match value_left {
                     Value::Number(el) => Ok(Value::Number(value_right.get_number()? + el)),
                     Value::String(st) => {
                         Ok(Value::String(st.add(value_right.get_string()?.as_str())))
@@ -351,26 +362,26 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                             .to_string(),
                         return_error: false,
                     }),
-                };
+                }
             }
             Operator::Minus => {
                 let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env);
                 let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env);
-                return Ok(Value::Number(
+                Ok(Value::Number(
                     value_left?.get_number()? - value_right?.get_number()?,
-                ));
+                ))
             }
             Operator::Mul => {
                 let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env);
                 let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env);
-                return Ok(Value::Number(
+                Ok(Value::Number(
                     value_left?.get_number()? * value_right?.get_number()?,
-                ));
+                ))
             }
             Operator::EQ => {
                 let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env)?;
                 let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
-                return match value_left {
+                match value_left {
                     Value::Number(nr) => Ok(Value::Bool(nr == value_right.get_number()?.clone())),
                     Value::String(str_l) => {
                         Ok(Value::Bool(str_l == value_right.get_string()?.clone()))
@@ -378,12 +389,12 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                     Value::Bool(vl) => Ok(Value::Bool(vl == value_right.get_boolean()?.clone())),
                     Value::Nil => Ok(Value::Bool(value_right.is_nil())),
                     _ => Ok(Value::Bool(false)),
-                };
+                }
             }
             Operator::NotEqual => {
                 let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env)?;
                 let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
-                return match value_left {
+                match value_left {
                     Value::Number(nr) => Ok(Value::Bool(nr != value_right.get_number()?.clone())),
                     Value::String(str_l) => {
                         Ok(Value::Bool(str_l != value_right.get_string()?.clone()))
@@ -391,55 +402,55 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                     Value::Bool(vl) => Ok(Value::Bool(vl != value_right.get_boolean()?.clone())),
                     Value::Nil => Ok(Value::Bool(!value_right.is_nil())),
                     _ => Ok(Value::Bool(false)),
-                };
+                }
             }
             Operator::GE => {
                 let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env)?;
                 let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
-                return match value_left {
+                match value_left {
                     Value::Number(nr) => {
                         Ok(Value::Bool(nr >= value_right.get_number()?.clone()))
                     },
                     _ => {
-                        Err(RunTimeError {message: format!("Cannot compare {value_left} with {value_right}. One of them is not a number"), return_error: false})
+                        Err(RunTimeError { message: format!("Cannot compare {value_left} with {value_right}. One of them is not a number"), return_error: false })
                     }
-                };
+                }
             }
             Operator::LE => {
                 let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env)?;
                 let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
-                return match value_left {
+                match value_left {
                     Value::Number(nr) => {
                         Ok(Value::Bool(nr <= value_right.get_number()?.clone()))
                     },
                     _ => {
-                        Err(RunTimeError {message: format!("Cannot compare {value_left} with {value_right}. One of them is not a number"), return_error: false})
+                        Err(RunTimeError { message: format!("Cannot compare {value_left} with {value_right}. One of them is not a number"), return_error: false })
                     }
-                };
+                }
             }
             Operator::Less => {
                 let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env)?;
                 let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
-                return match value_left {
+                match value_left {
                     Value::Number(nr) => {
                         Ok(Value::Bool(nr < value_right.get_number()?.clone()))
                     },
                     _ => {
-                        Err(RunTimeError {message: format!("Cannot compare {value_left} with {value_right}. One of them is not a number"), return_error: false})
+                        Err(RunTimeError { message: format!("Cannot compare {value_left} with {value_right}. One of them is not a number"), return_error: false })
                     }
-                };
+                }
             }
             Operator::Greater => {
                 let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env)?;
                 let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
-                return match value_left {
+                match value_left {
                     Value::Number(nr) => {
                         Ok(Value::Bool(nr > value_right.get_number()?.clone()))
                     },
                     _ => {
-                        Err(RunTimeError {message: format!("Cannot compare {value_left} with {value_right}. One of them is not a number"), return_error: false})
+                        Err(RunTimeError { message: format!("Cannot compare {value_left} with {value_right}. One of them is not a number"), return_error: false })
                     }
-                };
+                }
             }
             Operator::And => {
                 let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env)?;
@@ -447,7 +458,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                     return Ok(value_left);
                 }
                 let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
-                return Ok(value_right);
+                Ok(value_right)
             }
             Operator::Or => {
                 let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env)?;
@@ -455,26 +466,29 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                     return Ok(value_left);
                 }
                 let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
-                return Ok(value_right);
+                Ok(value_right)
             }
-            _ => {
-                return Err(RunTimeError {
-                    message: format!(
-                        "Operator {:?} is not a valid operator for a binary expression",
-                        expr.operator
-                    ),
-                    return_error: false,
-                })
-            }
-        }
+            _ => Err(RunTimeError {
+                message: format!(
+                    "Operator {:?} is not a valid operator for a binary expression",
+                    expr.operator
+                ),
+                return_error: false,
+            }),
+        };
     }
 
     fn visit_identifier_expression(
-        &self,
+        &mut self,
         expr: &Identifier,
         env: &Environment,
     ) -> Result<Value, RunTimeError> {
-        Ok(env.get(&expr.name)?.clone())
+        let dist = self.locals.get(&expr.raw_token.get_variable());
+        if dist.is_some() {
+            env.get_at(&expr.name, dist.unwrap())
+        } else {
+            Ok(env.get(&expr.name)?.clone())
+        }
     }
 
     fn visit_unary_expression(

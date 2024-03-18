@@ -53,6 +53,27 @@ impl Environment {
         Environment { node }
     }
 
+    pub fn get_at(&self, name: &String, dist: &u32) -> Result<Value, RunTimeError> {
+        let env = {
+            let mut node_it = self.node.clone();
+            for i in 0..dist.clone() {
+                node_it = {
+                    let c = node_it.borrow().parent.clone().unwrap();
+                    c
+                };
+            }
+            node_it
+        };
+        if env.borrow().map.contains_key(name) {
+            return Ok(env.borrow().map.get(name).unwrap().clone());
+        }
+
+        Err(RunTimeError {
+            message: format!("Undefined variable {name}").to_string(),
+            return_error: false,
+        })
+    }
+
     pub fn define(&mut self, var: String, value: Value) {
         self.node.borrow_mut().set(&var, value)
     }
@@ -70,6 +91,33 @@ impl Environment {
             } else {
                 break;
             }
+        }
+
+        Err(RunTimeError {
+            message: format!("Undefined variable {name}").to_string(),
+            return_error: false,
+        })
+    }
+
+    pub fn assign_at(
+        &mut self,
+        name: String,
+        value: Value,
+        dist: &u32,
+    ) -> Result<(), RunTimeError> {
+        let env = {
+            let mut node_it = self.node.clone();
+            for i in 0..dist.clone() {
+                node_it = {
+                    let c = node_it.borrow().parent.clone().unwrap();
+                    c
+                };
+            }
+            node_it
+        };
+        if env.borrow().map.contains_key(&name) {
+            env.borrow_mut().map.insert(name, value);
+            return Ok(());
         }
 
         Err(RunTimeError {

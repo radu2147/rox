@@ -336,7 +336,7 @@ impl<'a> Parser<'a> {
             let asignee = self.parse_assignment()?;
             if let Expression::Identifier(ident) = receiver {
                 return Ok(Expression::Assignment(Box::new(AssignmentExpression {
-                    name: ident.name.clone(),
+                    name: ident.raw_token,
                     asignee,
                 })));
             } else {
@@ -535,8 +535,8 @@ impl<'a> Parser<'a> {
             }
             Token::Identifier(name, _) => {
                 let name = name.clone();
-                self.advance();
-                return Ok(Expression::Identifier(Identifier { name }));
+                let raw_token = self.advance().unwrap().clone();
+                return Ok(Expression::Identifier(Identifier { name, raw_token }));
             }
             Token::Nil(_, _) => {
                 self.advance();

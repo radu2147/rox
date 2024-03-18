@@ -1,0 +1,2 @@
+for(var a = 0; a < 12; a = a + 1)
+print a;

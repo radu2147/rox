@@ -37,7 +37,8 @@ pub trait Visitor<V, E> {
         expr: &mut BinaryExpression,
         env: &mut Environment,
     ) -> Result<V, E>;
-    fn visit_identifier_expression(&self, expr: &Identifier, env: &Environment) -> Result<V, E>;
+    fn visit_identifier_expression(&mut self, expr: &Identifier, env: &Environment)
+        -> Result<V, E>;
     fn visit_unary_expression(
         &mut self,
         expr: &mut UnaryExpression,

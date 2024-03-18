@@ -2,7 +2,7 @@ use crate::environment::Environment;
 use crate::expression_visitor::Visitor;
 use crate::types::Token;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
     CallExpression(Box<CallExpression>),
     Binary(Box<BinaryExpression>),
@@ -25,42 +25,43 @@ impl Expression {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct AssignmentExpression {
-    pub name: String,
+    pub name: Token,
     pub asignee: Expression,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CallExpression {
     pub callee: Expression,
     pub arguments: Vec<Expression>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Identifier {
     pub name: String,
+    pub raw_token: Token,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct BinaryExpression {
     pub left: Expression,
     pub operator: Operator,
     pub right: Expression,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct UnaryExpression {
     pub operator: Operator,
     pub expression: Expression,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct GroupExpression {
     pub expression: Expression,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Operator {
     Plus,
     Minus,
@@ -105,5 +106,12 @@ impl Expression {
         env: &mut Environment,
     ) -> Result<V, E> {
         visitor.visit_expression(self, env)
+    }
+
+    pub fn get_name(&self) -> String {
+        match self {
+            Self::Identifier(ref ident) => ident.name.clone(),
+            _ => panic!("Not an identifier"),
+        }
     }
 }
