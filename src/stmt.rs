@@ -1,6 +1,7 @@
 use crate::ast_types::Expression;
 use crate::environment::Environment;
 use crate::statement_visitor::StatementVisitor;
+use crate::types::Token;
 
 #[derive(Debug, Clone)]
 pub enum Stmt {
@@ -12,6 +13,15 @@ pub enum Stmt {
     IfStatement(IfStatement),
     WhileStatement(WhileStatement),
     FunctionDeclaration(FunctionDeclaration),
+    ClassDeclaration(ClassDeclaration),
+}
+
+#[derive(Debug, Clone)]
+pub struct ClassDeclaration {
+    pub name: String,
+    pub raw_token: Token,
+    pub methods: Vec<Stmt>,
+    pub fields: Vec<Stmt>,
 }
 
 #[derive(Debug, Clone)]

@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use crate::interpreter::{RunTimeError, Value};
 use std::cell::RefCell;
+use std::ops::Deref;
 use std::rc::Rc;
 
 #[derive(Debug)]

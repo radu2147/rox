@@ -1,7 +1,7 @@
 use crate::environment::Environment;
 use crate::stmt::{
-    BlockStatement, ExpressionStatement, FunctionDeclaration, IfStatement, PrintStatement,
-    ReturnStatement, Stmt, VariableDeclarationStatement, WhileStatement,
+    BlockStatement, ClassDeclaration, ExpressionStatement, FunctionDeclaration, IfStatement,
+    PrintStatement, ReturnStatement, Stmt, VariableDeclarationStatement, WhileStatement,
 };
 
 pub trait StatementVisitor<V, E> {
@@ -15,8 +15,15 @@ pub trait StatementVisitor<V, E> {
             Stmt::WhileStatement(while_stmt) => self.visit_while_statement(while_stmt, env),
             Stmt::FunctionDeclaration(func_dec) => self.visit_function_declaration(func_dec, env),
             Stmt::ReturnStatement(return_stmt) => self.visit_return_statement(return_stmt, env),
+            Stmt::ClassDeclaration(class_decl) => self.visit_class_declaration(class_decl, env),
         }
     }
+
+    fn visit_class_declaration(
+        &mut self,
+        class_declaration: &mut ClassDeclaration,
+        env: &mut Environment,
+    ) -> Result<V, E>;
 
     fn visit_if_statement(
         &mut self,

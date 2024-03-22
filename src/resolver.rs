@@ -1,14 +1,14 @@
 use crate::ast_types::{
     AssignmentExpression, BinaryExpression, CallExpression, Expression, GroupExpression,
-    Identifier, UnaryExpression,
+    Identifier, MemberExpression, SetMemberExpression, UnaryExpression,
 };
 use crate::environment::Environment;
 use crate::expression_visitor::Visitor;
 use crate::interpreter::Interpreter;
 use crate::statement_visitor::StatementVisitor;
 use crate::stmt::{
-    BlockStatement, ExpressionStatement, FunctionDeclaration, IfStatement, PrintStatement,
-    ReturnStatement, Stmt, VariableDeclarationStatement, WhileStatement,
+    BlockStatement, ClassDeclaration, ExpressionStatement, FunctionDeclaration, IfStatement,
+    PrintStatement, ReturnStatement, Stmt, VariableDeclarationStatement, WhileStatement,
 };
 use crate::types::Token;
 use std::collections::HashMap;
@@ -17,6 +17,14 @@ pub struct Resolver<'a> {
     pub interpreter: &'a mut Interpreter,
     scopes: Vec<HashMap<String, bool>>,
     ln: usize,
+    current_function: FunctionType,
+}
+
+#[derive(Clone, PartialEq)]
+pub enum FunctionType {
+    None,
+    Function,
+    Method,
 }
 
 impl<'a> Resolver<'a> {
@@ -25,6 +33,7 @@ impl<'a> Resolver<'a> {
             interpreter,
             scopes: vec![HashMap::new()],
             ln: 1,
+            current_function: FunctionType::None,
         }
     }
 
@@ -32,6 +41,29 @@ impl<'a> Resolver<'a> {
         stmts.iter_mut().for_each(|mut stmt| {
             stmt.accept(self, env);
         });
+    }
+
+    pub fn resolve_function(
+        &mut self,
+        func_dec: &mut FunctionDeclaration,
+        env: &mut Environment,
+        typ: FunctionType,
+    ) -> Result<(), ()> {
+        let enc_fun = self.current_function.clone();
+        self.current_function = typ;
+
+        self.begin_scope();
+        for mut param in &mut func_dec.params {
+            self.declare(&param.get_name());
+            self.define(&param.get_name());
+            param.accept(self, env)?;
+        }
+        func_dec.body.accept(self, env)?;
+        self.end_scope();
+
+        self.current_function = enc_fun;
+
+        Ok(())
     }
 
     fn begin_scope(&mut self) {
@@ -76,6 +108,16 @@ impl<'a> Resolver<'a> {
 }
 
 impl Visitor<(), ()> for Resolver<'_> {
+    fn visit_set_member_expression(
+        &mut self,
+        expr: &mut SetMemberExpression,
+        env: &mut Environment,
+    ) -> Result<(), ()> {
+        expr.value.accept(self, env)?;
+        expr.object.accept(self, env)?;
+        Ok(())
+    }
+
     fn visit_call_expression(
         &mut self,
         expr: &mut CallExpression,
@@ -85,6 +127,15 @@ impl Visitor<(), ()> for Resolver<'_> {
         expr.arguments.iter_mut().for_each(|mut arg| {
             arg.accept(self, env);
         });
+        Ok(())
+    }
+
+    fn visit_member_expression(
+        &mut self,
+        expr: &mut MemberExpression,
+        env: &mut Environment,
+    ) -> Result<(), ()> {
+        expr.object.accept(self, env)?;
         Ok(())
     }
 
@@ -150,6 +201,28 @@ impl Visitor<(), ()> for Resolver<'_> {
 }
 
 impl StatementVisitor<(), ()> for Resolver<'_> {
+    fn visit_class_declaration(
+        &mut self,
+        class_declaration: &mut ClassDeclaration,
+        env: &mut Environment,
+    ) -> Result<(), ()> {
+        self.declare(&class_declaration.name);
+        self.define(&class_declaration.name);
+        for var in &mut class_declaration.fields {
+            if let Stmt::VarDeclarationStatement(func_dec) = var {
+                self.declare(&func_dec.name);
+                func_dec.initializer.accept(self, env)?;
+                self.define(&func_dec.name);
+            }
+        }
+        for method in &mut class_declaration.methods {
+            if let Stmt::FunctionDeclaration(func_dec) = method {
+                self.resolve_function(func_dec, env, FunctionType::Method)?;
+            }
+        }
+        Ok(())
+    }
+
     fn visit_if_statement(
         &mut self,
         if_statement: &mut IfStatement,
@@ -175,14 +248,7 @@ impl StatementVisitor<(), ()> for Resolver<'_> {
     ) -> Result<(), ()> {
         self.declare(&func_dec.name);
         self.define(&func_dec.name);
-        self.begin_scope();
-        for mut param in &mut func_dec.params {
-            self.declare(&param.get_name());
-            self.define(&param.get_name());
-            param.accept(self, env)?;
-        }
-        func_dec.body.accept(self, env)?;
-        self.end_scope();
+        self.resolve_function(func_dec, env, FunctionType::Function);
         Ok(())
     }
 
@@ -191,6 +257,10 @@ impl StatementVisitor<(), ()> for Resolver<'_> {
         return_stmt: &mut ReturnStatement,
         env: &mut Environment,
     ) -> Result<(), ()> {
+        if self.current_function == FunctionType::None {
+            println!("Return statement not allowed here");
+            return Err(());
+        }
         if return_stmt.return_expression.is_some() {
             return_stmt
                 .return_expression

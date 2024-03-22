@@ -1,10 +1,10 @@
 use crate::ast_types::{
     AssignmentExpression, BinaryExpression, CallExpression, Expression, GroupExpression,
-    Identifier, Operator, UnaryExpression,
+    Identifier, MemberExpression, Operator, SetMemberExpression, UnaryExpression,
 };
 use crate::stmt::{
-    BlockStatement, ExpressionStatement, FunctionDeclaration, IfStatement, PrintStatement,
-    ReturnStatement, Stmt, VariableDeclarationStatement, WhileStatement,
+    BlockStatement, ClassDeclaration, ExpressionStatement, FunctionDeclaration, IfStatement,
+    PrintStatement, ReturnStatement, Stmt, VariableDeclarationStatement, WhileStatement,
 };
 use crate::types::Token;
 use crate::ErrorHandler;
@@ -41,6 +41,51 @@ impl<'a> Parser<'a> {
 
     pub fn parse_declaration(&mut self) -> Result<Stmt, ParseError> {
         return match self.peek() {
+            Token::Class(_, _) => {
+                self.advance();
+                if let Token::Identifier(name, _) = self.peek() {
+                    let class_name = name.to_string();
+                    let raw_name_token = self.advance().unwrap().clone();
+                    if let Some(Token::LeftParen(_, _)) = self.advance() {
+                        let mut stmts = vec![];
+                        let mut fields = vec![];
+                        loop {
+                            if let Token::RightParen(_, _) = self.peek() {
+                                break;
+                            }
+                            if self.is_at_end() {
+                                break;
+                            }
+                            let stmt = self.parse_declaration()?;
+                            if let Stmt::FunctionDeclaration(_) = stmt {
+                                stmts.push(stmt);
+                            } else {
+                                fields.push(stmt);
+                            }
+                        }
+                        return if let Some(Token::RightParen(_, _)) = self.advance() {
+                            Ok(Stmt::ClassDeclaration(ClassDeclaration {
+                                name: class_name,
+                                raw_token: raw_name_token,
+                                methods: stmts,
+                                fields,
+                            }))
+                        } else {
+                            Err(ParseError {
+                                message: "Expected '}' after class declaration".to_string(),
+                            })
+                        };
+                    } else {
+                        return Err(ParseError {
+                            message: "Expected left paren after class declaration".to_string(),
+                        });
+                    }
+                } else {
+                    return Err(ParseError {
+                        message: "Expected identifier after class keyword".to_string(),
+                    });
+                }
+            }
             Token::Fun(_, _) => {
                 self.advance();
                 if let Token::Identifier(name, _) = self.peek() {
@@ -468,23 +513,40 @@ impl<'a> Parser<'a> {
 
     pub fn parse_call(&mut self) -> Result<Expression, ParseError> {
         let mut rez = self.parse_primary()?;
-        while let Token::LeftBrace(_, _) = self.peek() {
-            self.advance();
-            if let Token::RightBrace(_, _) = self.peek() {
+        loop {
+            if let Token::LeftBrace(_, _) = self.peek() {
                 self.advance();
-                return Ok(Expression::CallExpression(Box::new(CallExpression {
-                    callee: rez,
-                    arguments: vec![],
-                })));
-            } else {
-                let args = self.parse_arguments()?;
                 if let Token::RightBrace(_, _) = self.peek() {
                     self.advance();
-                    return Ok(Expression::CallExpression(Box::new(CallExpression {
+                    rez = Expression::CallExpression(Box::new(CallExpression {
                         callee: rez,
-                        arguments: args,
-                    })));
+                        arguments: vec![],
+                    }));
+                } else {
+                    let args = self.parse_arguments()?;
+                    if let Token::RightBrace(_, _) = self.peek() {
+                        self.advance();
+                        rez = Expression::CallExpression(Box::new(CallExpression {
+                            callee: rez,
+                            arguments: args,
+                        }));
+                    }
                 }
+            } else if let Token::Dot(_, _) = self.peek() {
+                self.advance();
+                if let Token::Identifier(_, _) = self.peek() {
+                    let token = self.advance().unwrap().clone();
+                    rez = Expression::Member(Box::new(MemberExpression {
+                        name: token,
+                        object: rez,
+                    }));
+                } else {
+                    return Err(ParseError {
+                        message: "Expected identifier after .".to_string(),
+                    });
+                }
+            } else {
+                break;
             }
         }
 

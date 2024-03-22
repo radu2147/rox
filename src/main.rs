@@ -93,7 +93,7 @@ fn main() {
             arity: 0,
             params: vec![],
             body: None,
-            std_call: Some(|_int, _env, _args| {
+            std_call: Some(|_int, _args| {
                 return Ok(Value::Number(
                     SystemTime::now()
                         .duration_since(UNIX_EPOCH)

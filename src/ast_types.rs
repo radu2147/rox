@@ -14,6 +14,8 @@ pub enum Expression {
     Identifier(Identifier),
     Group(Box<GroupExpression>),
     Assignment(Box<AssignmentExpression>),
+    Member(Box<MemberExpression>),
+    SetMember(Box<SetMemberExpression>),
 }
 
 impl Expression {
@@ -23,6 +25,19 @@ impl Expression {
             _ => panic!("Shouldn't be reachable"),
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct SetMemberExpression {
+    pub name: Token,
+    pub object: Expression,
+    pub value: Expression,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MemberExpression {
+    pub name: Token,
+    pub object: Expression,
 }
 
 #[derive(Debug, Clone, PartialEq)]

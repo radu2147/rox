@@ -1,2 +1,15 @@
-for(var a = 0; a < 12; a = a + 1)
-print a;
+class Beta {
+    var t = 2;
+}
+
+class Alo {
+    var c = Beta();
+    fun showA(a) {
+        print "Alo";
+        return a * 2;
+    }
+}
+
+var x = Alo();
+
+print Alo().c;

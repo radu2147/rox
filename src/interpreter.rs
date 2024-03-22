@@ -1,17 +1,17 @@
 use crate::ast_types::{
     AssignmentExpression, BinaryExpression, CallExpression, Expression, GroupExpression,
-    Identifier, Operator, UnaryExpression,
+    Identifier, MemberExpression, Operator, SetMemberExpression, UnaryExpression,
 };
 use crate::environment::Environment;
 use crate::expression_visitor::Visitor;
 use crate::statement_visitor::StatementVisitor;
 use crate::stmt::{
-    BlockStatement, ExpressionStatement, FunctionDeclaration, IfStatement, PrintStatement,
-    ReturnStatement, Stmt, VariableDeclarationStatement, WhileStatement,
+    BlockStatement, ClassDeclaration, ExpressionStatement, FunctionDeclaration, IfStatement,
+    PrintStatement, ReturnStatement, Stmt, VariableDeclarationStatement, WhileStatement,
 };
 use crate::types::{Token, Variable};
 use std::collections::HashMap;
-use std::fmt::Display;
+use std::fmt::{format, Display, Formatter};
 use std::ops::Add;
 
 #[derive(Debug)]
@@ -27,6 +27,42 @@ pub enum Value {
     Number(f32),
     Nil,
     Callable(Callable),
+    Class(RoxClass),
+    Instance(RoxClassInstance),
+}
+
+#[derive(Debug, Clone)]
+pub struct RoxClass {
+    pub name: String,
+    pub methods: HashMap<String, Callable>,
+    pub fields: HashMap<String, Value>,
+}
+
+#[derive(Debug, Clone)]
+pub struct RoxClassInstance {
+    fields: HashMap<String, Value>,
+    class: RoxClass,
+}
+
+impl Display for RoxClass {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        return write!(f, "{}", self.name.to_string());
+    }
+}
+
+impl Display for RoxClassInstance {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        return write!(f, "{} instance", "TGWT");
+    }
+}
+
+impl RoxClass {
+    pub fn constructor(&self, _params: Vec<Expression>) -> Result<Value, RunTimeError> {
+        Ok(Value::Instance(RoxClassInstance {
+            fields: HashMap::new(),
+            class: self.clone(),
+        }))
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -35,22 +71,12 @@ pub struct Callable {
     pub body: Option<Stmt>,
     pub params: Vec<Expression>,
     pub closure: Environment,
-    pub std_call: Option<
-        fn(
-            int: &mut Interpreter,
-            env: &mut Environment,
-            args: Vec<Value>,
-        ) -> Result<Value, RunTimeError>,
-    >,
+    pub std_call:
+        Option<fn(int: &mut Interpreter, args: Vec<Value>) -> Result<Value, RunTimeError>>,
 }
 
 impl Callable {
-    pub fn call(
-        &mut self,
-        int: &mut Interpreter,
-        env: &mut Environment,
-        args: Vec<Value>,
-    ) -> Result<Value, RunTimeError> {
+    pub fn call(&mut self, int: &mut Interpreter, args: Vec<Value>) -> Result<Value, RunTimeError> {
         let mut env = self.closure.extend();
         for (ind, it) in args.iter().enumerate() {
             env.define(self.params[ind].get_identifier_name(), it.clone());
@@ -73,7 +99,7 @@ impl Callable {
             }
             None => {
                 return match self.std_call {
-                    Some(fun) => Ok(fun(int, &mut env, args)?),
+                    Some(fun) => Ok(fun(int, args)?),
                     None => Ok(Value::Nil),
                 }
             }
@@ -98,6 +124,8 @@ impl Display for Value {
             Self::Number(nr) => nr.to_string(),
             Self::String(st) => st.to_string(),
             Self::Callable(_) => "".to_string(),
+            Self::Class(class_decl) => class_decl.name.to_string(),
+            Self::Instance(class_inst) => class_inst.to_string(),
         };
         return write!(f, "{}", str);
     }
@@ -141,17 +169,13 @@ impl Value {
     }
 
     pub fn get_boolean(&self) -> Result<&bool, RunTimeError> {
-        match self {
-            Self::Bool(x) => {
-                return Ok(x);
-            }
-            _ => {
-                return Err(RunTimeError {
-                    message: format!("Value {self} is not a bool").to_string(),
-                    return_error: false,
-                })
-            }
-        }
+        return match self {
+            Self::Bool(x) => Ok(x),
+            _ => Err(RunTimeError {
+                message: format!("Value {self} is not a bool").to_string(),
+                return_error: false,
+            }),
+        };
     }
 
     pub fn is_nil(&self) -> bool {
@@ -185,6 +209,40 @@ impl Interpreter {
 }
 
 impl StatementVisitor<(), RunTimeError> for Interpreter {
+    fn visit_class_declaration(
+        &mut self,
+        class_declaration: &mut ClassDeclaration,
+        env: &mut Environment,
+    ) -> Result<(), RunTimeError> {
+        let mut methods = HashMap::new();
+        let mut fields = HashMap::new();
+        for field in &mut class_declaration.fields {
+            if let Stmt::VarDeclarationStatement(func_dec) = field {
+                fields.insert(
+                    func_dec.name.clone(),
+                    func_dec.initializer.accept(self, env)?,
+                );
+            }
+        }
+        for method in &mut class_declaration.methods {
+            if let Stmt::FunctionDeclaration(func_dec) = method {
+                methods.insert(
+                    func_dec.name.clone(),
+                    Callable::from_node(func_dec, env.clone()),
+                );
+            }
+        }
+        env.define(
+            class_declaration.name.clone(),
+            Value::Class(RoxClass {
+                name: class_declaration.name.clone(),
+                methods,
+                fields,
+            }),
+        );
+        Ok(())
+    }
+
     fn visit_if_statement(
         &mut self,
         if_statement: &mut IfStatement,
@@ -289,6 +347,24 @@ impl StatementVisitor<(), RunTimeError> for Interpreter {
 }
 
 impl Visitor<Value, RunTimeError> for Interpreter {
+    fn visit_set_member_expression(
+        &mut self,
+        expr: &mut SetMemberExpression,
+        env: &mut Environment,
+    ) -> Result<Value, RunTimeError> {
+        let mut obj = expr.object.accept(self, env)?;
+        let name = expr.name.get_variable().name;
+        let value = expr.value.accept(self, env)?;
+        if let Value::Instance(ref mut inst) = obj {
+            inst.fields.insert(name, value.clone());
+            return Ok(value.clone());
+        }
+        Err(RunTimeError {
+            message: "Undefined variable".to_string(),
+            return_error: false,
+        })
+    }
+
     fn visit_call_expression(
         &mut self,
         expr: &mut CallExpression,
@@ -313,10 +389,41 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                 });
             }
 
-            return Ok(callable.call(self, env, args)?);
+            return Ok(callable.call(self, args)?);
+        }
+        if let Value::Class(mut class) = callable {
+            return Ok(class.constructor(vec![])?);
         }
         return Err(RunTimeError {
             message: "Expression not callable".to_string(),
+            return_error: false,
+        });
+    }
+
+    fn visit_member_expression(
+        &mut self,
+        expr: &mut MemberExpression,
+        env: &mut Environment,
+    ) -> Result<Value, RunTimeError> {
+        let instance = expr.object.accept(self, env)?;
+        if let Value::Instance(mut instance) = instance {
+            let mthd = instance.class.methods.get(&expr.name.get_variable().name);
+            if let Some(method) = mthd {
+                return Ok(Value::Callable(method.clone()));
+            }
+            let field = instance.class.fields.get(&expr.name.get_variable().name);
+            if let Some(value) = field {
+                return Ok(value.clone());
+            } else {
+                return Err(RunTimeError {
+                    message: format!("No such field for {}", instance.to_string()).to_string(),
+                    return_error: false,
+                });
+            }
+        }
+
+        return Err(RunTimeError {
+            message: "Object is not a class".to_string(),
             return_error: false,
         });
     }

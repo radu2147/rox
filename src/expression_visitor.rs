@@ -1,6 +1,6 @@
 use crate::ast_types::{
     AssignmentExpression, BinaryExpression, CallExpression, Expression, GroupExpression,
-    Identifier, UnaryExpression,
+    Identifier, MemberExpression, SetMemberExpression, UnaryExpression,
 };
 use crate::environment::Environment;
 
@@ -17,12 +17,26 @@ pub trait Visitor<V, E> {
             Expression::Identifier(expr) => self.visit_identifier_expression(expr, env),
             Expression::Assignment(assign) => self.visit_assignement_expression(assign, env),
             Expression::CallExpression(call) => self.visit_call_expression(call, env),
+            Expression::Member(member) => self.visit_member_expression(member, env),
+            Expression::SetMember(member) => self.visit_set_member_expression(member, env),
         }
     }
+
+    fn visit_set_member_expression(
+        &mut self,
+        expr: &mut SetMemberExpression,
+        env: &mut Environment,
+    ) -> Result<V, E>;
 
     fn visit_call_expression(
         &mut self,
         expr: &mut CallExpression,
+        env: &mut Environment,
+    ) -> Result<V, E>;
+
+    fn visit_member_expression(
+        &mut self,
+        expr: &mut MemberExpression,
         env: &mut Environment,
     ) -> Result<V, E>;
 
