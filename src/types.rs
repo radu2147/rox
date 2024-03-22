@@ -50,6 +50,10 @@ impl Token {
                 name: name.clone(),
                 line: line.clone(),
             },
+            Token::This(name, line) => Variable {
+                name: name.clone(),
+                line: line.clone(),
+            },
             _ => panic!("Not a variable"),
         }
     }

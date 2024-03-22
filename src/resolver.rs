@@ -1,6 +1,6 @@
 use crate::ast_types::{
     AssignmentExpression, BinaryExpression, CallExpression, Expression, GroupExpression,
-    Identifier, MemberExpression, SetMemberExpression, UnaryExpression,
+    Identifier, MemberExpression, SetMemberExpression, ThisExpression, UnaryExpression,
 };
 use crate::environment::Environment;
 use crate::expression_visitor::Visitor;
@@ -18,6 +18,7 @@ pub struct Resolver<'a> {
     scopes: Vec<HashMap<String, bool>>,
     ln: usize,
     current_function: FunctionType,
+    current_type: ClassType,
 }
 
 #[derive(Clone, PartialEq)]
@@ -27,6 +28,12 @@ pub enum FunctionType {
     Method,
 }
 
+#[derive(Clone, PartialEq)]
+pub enum ClassType {
+    None,
+    This,
+}
+
 impl<'a> Resolver<'a> {
     pub fn new(interpreter: &'a mut Interpreter) -> Self {
         Self {
@@ -34,6 +41,7 @@ impl<'a> Resolver<'a> {
             scopes: vec![HashMap::new()],
             ln: 1,
             current_function: FunctionType::None,
+            current_type: ClassType::None,
         }
     }
 
@@ -108,6 +116,19 @@ impl<'a> Resolver<'a> {
 }
 
 impl Visitor<(), ()> for Resolver<'_> {
+    fn visit_this_expression(
+        &mut self,
+        expr: &mut ThisExpression,
+        env: &mut Environment,
+    ) -> Result<(), ()> {
+        if self.current_type == ClassType::None {
+            println!("This statement not allowed outside class scope");
+            return Err(());
+        }
+        self.resolve_local(&expr.keyword);
+        Ok(())
+    }
+
     fn visit_set_member_expression(
         &mut self,
         expr: &mut SetMemberExpression,
@@ -208,6 +229,13 @@ impl StatementVisitor<(), ()> for Resolver<'_> {
     ) -> Result<(), ()> {
         self.declare(&class_declaration.name);
         self.define(&class_declaration.name);
+        let typ = self.current_type.clone();
+        self.current_type = ClassType::This;
+        self.begin_scope();
+
+        self.declare(&"this".to_string());
+        self.define(&"this".to_string());
+
         for var in &mut class_declaration.fields {
             if let Stmt::VarDeclarationStatement(func_dec) = var {
                 self.declare(&func_dec.name);
@@ -220,6 +248,9 @@ impl StatementVisitor<(), ()> for Resolver<'_> {
                 self.resolve_function(func_dec, env, FunctionType::Method)?;
             }
         }
+
+        self.end_scope();
+        self.current_type = ClassType::None;
         Ok(())
     }
 

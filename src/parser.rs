@@ -1,6 +1,6 @@
 use crate::ast_types::{
     AssignmentExpression, BinaryExpression, CallExpression, Expression, GroupExpression,
-    Identifier, MemberExpression, Operator, SetMemberExpression, UnaryExpression,
+    Identifier, MemberExpression, Operator, SetMemberExpression, ThisExpression, UnaryExpression,
 };
 use crate::stmt::{
     BlockStatement, ClassDeclaration, ExpressionStatement, FunctionDeclaration, IfStatement,
@@ -594,6 +594,12 @@ impl<'a> Parser<'a> {
                 } else {
                     panic!("Unreachable code");
                 }
+            }
+            Token::This(_, _) => {
+                let keyword = self.advance().unwrap().clone();
+                return Ok(Expression::ThisExpression(Box::new(ThisExpression {
+                    keyword,
+                })));
             }
             Token::Identifier(name, _) => {
                 let name = name.clone();

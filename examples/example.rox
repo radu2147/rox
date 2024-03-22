@@ -1,15 +1,16 @@
-class Beta {
-    var t = 2;
-}
-
 class Alo {
-    var c = Beta();
-    fun showA(a) {
-        print "Alo";
-        return a * 2;
+    var a = 1;
+    fun constructor(b, y){
+    }
+    fun showA() {
+        if(this.a == 1) {
+            return -1;
+        }
+        return this.a * 2;
     }
 }
 
-var x = Alo();
+var x = Alo(2, 3);
+var y = Alo(4, 5);
 
-print Alo().c;
+print y.showA();

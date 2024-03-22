@@ -16,6 +16,7 @@ pub enum Expression {
     Assignment(Box<AssignmentExpression>),
     Member(Box<MemberExpression>),
     SetMember(Box<SetMemberExpression>),
+    ThisExpression(Box<ThisExpression>),
 }
 
 impl Expression {
@@ -25,6 +26,11 @@ impl Expression {
             _ => panic!("Shouldn't be reachable"),
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ThisExpression {
+    pub keyword: Token,
 }
 
 #[derive(Debug, Clone, PartialEq)]

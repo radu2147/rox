@@ -1,6 +1,6 @@
 use crate::ast_types::{
     AssignmentExpression, BinaryExpression, CallExpression, Expression, GroupExpression,
-    Identifier, MemberExpression, Operator, SetMemberExpression, UnaryExpression,
+    Identifier, MemberExpression, Operator, SetMemberExpression, ThisExpression, UnaryExpression,
 };
 use crate::environment::Environment;
 use crate::expression_visitor::Visitor;
@@ -57,7 +57,39 @@ impl Display for RoxClassInstance {
 }
 
 impl RoxClass {
-    pub fn constructor(&self, _params: Vec<Expression>) -> Result<Value, RunTimeError> {
+    pub fn constructor(
+        &self,
+        interpreter: &mut Interpreter,
+        args: Vec<Value>,
+    ) -> Result<Value, RunTimeError> {
+        let method = self.methods.get("constructor");
+        if let Some(mut init_method) = method {
+            let mut end_class = self.clone();
+            for (index, param) in init_method.params.iter().enumerate() {
+                if end_class.fields.contains_key(&param.get_name()) {
+                    return Err(RunTimeError {
+                        message: format!(
+                            "Property {} already defined on instance",
+                            param.get_name().clone()
+                        ),
+                        return_error: false,
+                    });
+                }
+                end_class
+                    .fields
+                    .insert(param.get_name(), args.get(index).unwrap().clone());
+            }
+            let instance = RoxClassInstance {
+                fields: HashMap::new(),
+                class: end_class,
+            };
+            init_method
+                .clone()
+                .bind(&instance)
+                .clone()
+                .call(interpreter, args)?;
+            return Ok(Value::Instance(instance));
+        }
         Ok(Value::Instance(RoxClassInstance {
             fields: HashMap::new(),
             class: self.clone(),
@@ -76,6 +108,17 @@ pub struct Callable {
 }
 
 impl Callable {
+    pub fn bind(&mut self, inst: &RoxClassInstance) -> Self {
+        let mut env = self.closure.extend();
+        env.define("this".to_string(), Value::Instance(inst.clone()));
+        Self {
+            arity: self.arity,
+            body: self.body.clone(),
+            params: self.params.clone(),
+            closure: env,
+            std_call: self.std_call,
+        }
+    }
     pub fn call(&mut self, int: &mut Interpreter, args: Vec<Value>) -> Result<Value, RunTimeError> {
         let mut env = self.closure.extend();
         for (ind, it) in args.iter().enumerate() {
@@ -347,6 +390,19 @@ impl StatementVisitor<(), RunTimeError> for Interpreter {
 }
 
 impl Visitor<Value, RunTimeError> for Interpreter {
+    fn visit_this_expression(
+        &mut self,
+        expr: &mut ThisExpression,
+        env: &mut Environment,
+    ) -> Result<Value, RunTimeError> {
+        let dist = self.locals.get(&expr.keyword.get_variable());
+        if dist.is_some() {
+            env.get_at(&"this".to_string(), dist.unwrap())
+        } else {
+            Ok(env.get(&"this".to_string())?.clone())
+        }
+    }
+
     fn visit_set_member_expression(
         &mut self,
         expr: &mut SetMemberExpression,
@@ -392,7 +448,11 @@ impl Visitor<Value, RunTimeError> for Interpreter {
             return Ok(callable.call(self, args)?);
         }
         if let Value::Class(mut class) = callable {
-            return Ok(class.constructor(vec![])?);
+            let mut args = Vec::new();
+            for arg in &mut expr.arguments {
+                args.push(arg.accept(self, env)?);
+            }
+            return Ok(class.constructor(self, args)?);
         }
         return Err(RunTimeError {
             message: "Expression not callable".to_string(),
@@ -407,9 +467,10 @@ impl Visitor<Value, RunTimeError> for Interpreter {
     ) -> Result<Value, RunTimeError> {
         let instance = expr.object.accept(self, env)?;
         if let Value::Instance(mut instance) = instance {
-            let mthd = instance.class.methods.get(&expr.name.get_variable().name);
-            if let Some(method) = mthd {
-                return Ok(Value::Callable(method.clone()));
+            let mut mthd = instance.class.methods.get(&expr.name.get_variable().name);
+            if let Some(ref mut method) = mthd {
+                let value = method.clone().bind(&instance).clone();
+                return Ok(Value::Callable(value));
             }
             let field = instance.class.fields.get(&expr.name.get_variable().name);
             if let Some(value) = field {
