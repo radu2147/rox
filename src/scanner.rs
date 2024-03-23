@@ -1,5 +1,6 @@
 use crate::types::Token;
 use crate::ErrorHandler;
+use uuid::Uuid;
 
 pub struct Scanner<'a> {
     pub source: String,
@@ -138,8 +139,11 @@ impl<'a> Scanner<'a> {
                 if let Some(tok) = self.get_keyword_token(&identifier_string, self.line) {
                     self.tokens.push(tok)
                 } else {
-                    self.tokens
-                        .push(Token::Identifier(identifier_string, self.line))
+                    self.tokens.push(Token::Identifier(
+                        identifier_string,
+                        Uuid::new_v4().to_string(),
+                        self.line,
+                    ))
                 }
             }
             '\n' => self.line += 1,

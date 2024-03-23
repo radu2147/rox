@@ -43,7 +43,7 @@ impl<'a> Parser<'a> {
         return match self.peek() {
             Token::Class(_, _) => {
                 self.advance();
-                if let Token::Identifier(name, _) = self.peek() {
+                if let Token::Identifier(name, _, _) = self.peek() {
                     let class_name = name.to_string();
                     let raw_name_token = self.advance().unwrap().clone();
                     if let Some(Token::LeftParen(_, _)) = self.advance() {
@@ -88,7 +88,7 @@ impl<'a> Parser<'a> {
             }
             Token::Fun(_, _) => {
                 self.advance();
-                if let Token::Identifier(name, _) = self.peek() {
+                if let Token::Identifier(name, _, _) = self.peek() {
                     let name = name.clone();
                     self.advance();
                     if let Token::LeftBrace(_, _) = self.peek() {
@@ -120,7 +120,7 @@ impl<'a> Parser<'a> {
             }
             Token::Var(_, _) => {
                 self.advance();
-                if let Token::Identifier(name, _) = self.peek() {
+                if let Token::Identifier(name, _, _) = self.peek() {
                     let name = name.clone();
                     self.advance();
                     let mut initializer = Expression::NilLiteral;
@@ -151,7 +151,7 @@ impl<'a> Parser<'a> {
 
     pub fn parse_parameters(&mut self) -> Result<Vec<Expression>, ParseError> {
         let mut rez = Vec::new();
-        while let Token::Identifier(name, _) = self.peek() {
+        while let Token::Identifier(name, _, _) = self.peek() {
             rez.push(self.parse_primary()?);
             if let Token::Comma(_, _) = self.peek() {
                 self.advance();
@@ -534,7 +534,7 @@ impl<'a> Parser<'a> {
                 }
             } else if let Token::Dot(_, _) = self.peek() {
                 self.advance();
-                if let Token::Identifier(_, _) = self.peek() {
+                if let Token::Identifier(_, _, _) = self.peek() {
                     let token = self.advance().unwrap().clone();
                     rez = Expression::Member(Box::new(MemberExpression {
                         name: token,
@@ -601,7 +601,7 @@ impl<'a> Parser<'a> {
                     keyword,
                 })));
             }
-            Token::Identifier(name, _) => {
+            Token::Identifier(name, _, _) => {
                 let name = name.clone();
                 let raw_token = self.advance().unwrap().clone();
                 return Ok(Expression::Identifier(Identifier { name, raw_token }));

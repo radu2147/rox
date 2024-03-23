@@ -250,7 +250,7 @@ impl StatementVisitor<(), ()> for Resolver<'_> {
         }
 
         self.end_scope();
-        self.current_type = ClassType::None;
+        self.current_type = typ;
         Ok(())
     }
 

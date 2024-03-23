@@ -21,7 +21,7 @@ pub enum Token {
     GraterEqual(String, i32),
     Less(String, i32),
     LessEqual(String, i32),
-    Identifier(String, i32),
+    Identifier(String, String, i32),
     String(String, String, i32),
     Number(String, f32, i32),
     And(String, i32),
@@ -46,13 +46,15 @@ pub enum Token {
 impl Token {
     pub fn get_variable(&self) -> Variable {
         match self {
-            Token::Identifier(name, line) => Variable {
+            Token::Identifier(name, id, line) => Variable {
                 name: name.clone(),
                 line: line.clone(),
+                id: id.clone(),
             },
             Token::This(name, line) => Variable {
                 name: name.clone(),
                 line: line.clone(),
+                id: "1".to_string(),
             },
             _ => panic!("Not a variable"),
         }
@@ -63,4 +65,5 @@ impl Token {
 pub struct Variable {
     pub name: String,
     pub line: i32,
+    pub id: String,
 }

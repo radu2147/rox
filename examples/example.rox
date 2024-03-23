@@ -1,16 +1,8 @@
-class Alo {
-    var a = 1;
-    fun constructor(b, y){
-    }
-    fun showA() {
-        if(this.a == 1) {
-            return -1;
-        }
-        return this.a * 2;
+var i = 0;
+for(;;) {
+    if(i < 10) {
+        print i;
+    } else {
+        break;
     }
 }
-
-var x = Alo(2, 3);
-var y = Alo(4, 5);
-
-print y.showA();
