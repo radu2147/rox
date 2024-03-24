@@ -14,25 +14,6 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::ops::Add;
 
-trait RecoverFromBreak {
-    fn recover(self) -> Self;
-}
-
-impl RecoverFromBreak for Result<(), RunTimeError> {
-    fn recover(self) -> Self {
-        match self {
-            Ok(()) => Ok(()),
-            Err(e) => {
-                if e.loop_break {
-                    Ok(())
-                } else {
-                    Err(e)
-                }
-            }
-        }
-    }
-}
-
 #[derive(Debug)]
 pub struct RunTimeError {
     pub message: String,
