@@ -31,15 +31,17 @@ fn run(code: String, error_handler: &mut ErrorHandler, env: &mut Environment) {
     };
     let mut resolver = Resolver::new(&mut interpreter);
     match parser.parse_program() {
-        Ok(mut t) => {
-            resolver.resolve(env, &mut t);
-            match interpreter.interpret(&mut t, env) {
+        Ok(mut t) => match resolver.resolve(env, &mut t) {
+            Ok(()) => match interpreter.interpret(&mut t, env) {
                 Ok(_) => {}
                 Err(e) => {
                     println!("{:?}", e);
                 }
+            },
+            Err(e) => {
+                println!("{:?}", e)
             }
-        }
+        },
         Err(e) => println!("{:?}", e),
     }
 }
