@@ -72,6 +72,7 @@ impl Environment {
         Err(RunTimeError {
             message: format!("Undefined variable {name}").to_string(),
             return_error: false,
+            loop_break: false,
         })
     }
 
@@ -97,6 +98,7 @@ impl Environment {
         Err(RunTimeError {
             message: format!("Undefined variable {name}").to_string(),
             return_error: false,
+            loop_break: false,
         })
     }
 
@@ -124,6 +126,7 @@ impl Environment {
         Err(RunTimeError {
             message: format!("Undefined variable {name}").to_string(),
             return_error: false,
+            loop_break: false,
         })
     }
 
@@ -146,6 +149,7 @@ impl Environment {
         Err(RunTimeError {
             message: format!("Undefined variable {name}").to_string(),
             return_error: false,
+            loop_break: false,
         })
     }
 

@@ -16,8 +16,11 @@ pub trait StatementVisitor<V, E> {
             Stmt::FunctionDeclaration(func_dec) => self.visit_function_declaration(func_dec, env),
             Stmt::ReturnStatement(return_stmt) => self.visit_return_statement(return_stmt, env),
             Stmt::ClassDeclaration(class_decl) => self.visit_class_declaration(class_decl, env),
+            Stmt::BreakStatement => self.visit_break_statement(env),
         }
     }
+
+    fn visit_break_statement(&mut self, env: &mut Environment) -> Result<V, E>;
 
     fn visit_class_declaration(
         &mut self,

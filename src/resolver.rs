@@ -19,6 +19,7 @@ pub struct Resolver<'a> {
     ln: usize,
     current_function: FunctionType,
     current_type: ClassType,
+    is_loop: bool,
 }
 
 #[derive(Clone, PartialEq)]
@@ -42,6 +43,7 @@ impl<'a> Resolver<'a> {
             ln: 1,
             current_function: FunctionType::None,
             current_type: ClassType::None,
+            is_loop: false,
         }
     }
 
@@ -222,6 +224,15 @@ impl Visitor<(), ()> for Resolver<'_> {
 }
 
 impl StatementVisitor<(), ()> for Resolver<'_> {
+    fn visit_break_statement(&mut self, _env: &mut Environment) -> Result<(), ()> {
+        if !self.is_loop {
+            println!("Forbidden use of break statement");
+            return Err(());
+        }
+
+        Ok(())
+    }
+
     fn visit_class_declaration(
         &mut self,
         class_declaration: &mut ClassDeclaration,
@@ -307,8 +318,11 @@ impl StatementVisitor<(), ()> for Resolver<'_> {
         while_statement: &mut WhileStatement,
         env: &mut Environment,
     ) -> Result<(), ()> {
+        let init = self.is_loop;
+        self.is_loop = true;
         while_statement.expression.accept(self, env)?;
         while_statement.statement.accept(self, env)?;
+        self.is_loop = init;
         Ok(())
     }
 

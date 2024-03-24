@@ -11,13 +11,33 @@ use crate::stmt::{
 };
 use crate::types::{Token, Variable};
 use std::collections::HashMap;
-use std::fmt::{format, Display, Formatter};
+use std::fmt::{Display, Formatter};
 use std::ops::Add;
+
+trait RecoverFromBreak {
+    fn recover(self) -> Self;
+}
+
+impl RecoverFromBreak for Result<(), RunTimeError> {
+    fn recover(self) -> Self {
+        match self {
+            Ok(()) => Ok(()),
+            Err(e) => {
+                if e.loop_break {
+                    Ok(())
+                } else {
+                    Err(e)
+                }
+            }
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct RunTimeError {
     pub message: String,
     pub return_error: bool,
+    pub loop_break: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -73,6 +93,7 @@ impl RoxClass {
                             param.get_name().clone()
                         ),
                         return_error: false,
+                        loop_break: false,
                     });
                 }
                 end_class
@@ -192,6 +213,7 @@ impl Value {
                 return Err(RunTimeError {
                     message: format!("Value {self} is not a number").to_string(),
                     return_error: false,
+                    loop_break: false,
                 });
             }
         }
@@ -206,6 +228,7 @@ impl Value {
                 return Err(RunTimeError {
                     message: format!("Value {self} is not a string").to_string(),
                     return_error: false,
+                    loop_break: false,
                 });
             }
         }
@@ -217,6 +240,7 @@ impl Value {
             _ => Err(RunTimeError {
                 message: format!("Value {self} is not a bool").to_string(),
                 return_error: false,
+                loop_break: false,
             }),
         };
     }
@@ -252,6 +276,14 @@ impl Interpreter {
 }
 
 impl StatementVisitor<(), RunTimeError> for Interpreter {
+    fn visit_break_statement(&mut self, _env: &mut Environment) -> Result<(), RunTimeError> {
+        Err(RunTimeError {
+            message: "".to_string(),
+            return_error: false,
+            loop_break: true,
+        })
+    }
+
     fn visit_class_declaration(
         &mut self,
         class_declaration: &mut ClassDeclaration,
@@ -330,6 +362,7 @@ impl StatementVisitor<(), RunTimeError> for Interpreter {
         Err(RunTimeError {
             message: "".to_string(),
             return_error: true,
+            loop_break: false,
         })
     }
 
@@ -343,7 +376,16 @@ impl StatementVisitor<(), RunTimeError> for Interpreter {
             if !cond.is_truthy() {
                 break;
             }
-            while_statement.statement.accept(self, env)?;
+            match while_statement.statement.accept(self, env) {
+                Ok(()) => {}
+                Err(e) => {
+                    if e.loop_break {
+                        break;
+                    } else {
+                        return Err(e);
+                    }
+                }
+            }
         }
         Ok(())
     }
@@ -418,6 +460,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
         Err(RunTimeError {
             message: "Undefined variable".to_string(),
             return_error: false,
+            loop_break: false,
         })
     }
 
@@ -442,6 +485,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                     )
                     .to_string(),
                     return_error: false,
+                    loop_break: false,
                 });
             }
 
@@ -457,6 +501,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
         return Err(RunTimeError {
             message: "Expression not callable".to_string(),
             return_error: false,
+            loop_break: false,
         });
     }
 
@@ -479,6 +524,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                 return Err(RunTimeError {
                     message: format!("No such field for {}", instance.to_string()).to_string(),
                     return_error: false,
+                    loop_break: false,
                 });
             }
         }
@@ -486,6 +532,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
         return Err(RunTimeError {
             message: "Object is not a class".to_string(),
             return_error: false,
+            loop_break: false,
         });
     }
 
@@ -529,6 +576,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                         message: "Cannot add 2 values that are not both strings or numbers"
                             .to_string(),
                         return_error: false,
+                        loop_break: false,
                     }),
                 }
             }
@@ -580,7 +628,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                         Ok(Value::Bool(nr >= value_right.get_number()?.clone()))
                     },
                     _ => {
-                        Err(RunTimeError { message: format!("Cannot compare {value_left} with {value_right}. One of them is not a number"), return_error: false })
+                        Err(RunTimeError { message: format!("Cannot compare {value_left} with {value_right}. One of them is not a number"), return_error: false,loop_break: false })
                     }
                 }
             }
@@ -592,7 +640,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                         Ok(Value::Bool(nr <= value_right.get_number()?.clone()))
                     },
                     _ => {
-                        Err(RunTimeError { message: format!("Cannot compare {value_left} with {value_right}. One of them is not a number"), return_error: false })
+                        Err(RunTimeError { message: format!("Cannot compare {value_left} with {value_right}. One of them is not a number"), return_error: false,loop_break: false })
                     }
                 }
             }
@@ -604,7 +652,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                         Ok(Value::Bool(nr < value_right.get_number()?.clone()))
                     },
                     _ => {
-                        Err(RunTimeError { message: format!("Cannot compare {value_left} with {value_right}. One of them is not a number"), return_error: false })
+                        Err(RunTimeError { message: format!("Cannot compare {value_left} with {value_right}. One of them is not a number"), return_error: false,loop_break: false })
                     }
                 }
             }
@@ -616,7 +664,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                         Ok(Value::Bool(nr > value_right.get_number()?.clone()))
                     },
                     _ => {
-                        Err(RunTimeError { message: format!("Cannot compare {value_left} with {value_right}. One of them is not a number"), return_error: false })
+                        Err(RunTimeError { message: format!("Cannot compare {value_left} with {value_right}. One of them is not a number"), return_error: false,loop_break: false })
                     }
                 }
             }
@@ -642,6 +690,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                     expr.operator
                 ),
                 return_error: false,
+                loop_break: false,
             }),
         };
     }
@@ -683,6 +732,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                     expr.operator
                 ),
                 return_error: false,
+                loop_break: false,
             }),
         };
     }

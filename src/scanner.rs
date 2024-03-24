@@ -192,6 +192,7 @@ impl<'a> Scanner<'a> {
             "false" => Some(Token::False("".to_string(), line)),
             "var" => Some(Token::Var("".to_string(), line)),
             "fun" => Some(Token::Fun("".to_string(), line)),
+            "break" => Some(Token::Break(line)),
             _ => None,
         }
     }

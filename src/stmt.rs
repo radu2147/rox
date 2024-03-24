@@ -5,6 +5,7 @@ use crate::types::Token;
 
 #[derive(Debug, Clone)]
 pub enum Stmt {
+    BreakStatement,
     ReturnStatement(ReturnStatement),
     PrintStatement(PrintStatement),
     ExpressionStatement(ExpressionStatement),

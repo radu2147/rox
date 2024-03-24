@@ -182,6 +182,17 @@ impl<'a> Parser<'a> {
                     })
                 }
             }
+            Token::Break(_) => {
+                self.advance();
+                if let Token::Semicolon(_, _) = self.peek() {
+                    self.advance();
+                    Ok(Stmt::BreakStatement)
+                } else {
+                    Err(ParseError {
+                        message: "; expected after a return statement".to_string(),
+                    })
+                }
+            }
             Token::Return(_, _) => {
                 self.advance();
                 if let Token::Semicolon(_, _) = self.peek() {

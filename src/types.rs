@@ -40,6 +40,7 @@ pub enum Token {
     False(String, i32),
     Var(String, i32),
     While(String, i32),
+    Break(i32),
     Eof(String, i32),
 }
 
