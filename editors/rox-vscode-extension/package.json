@@ -1,0 +1,25 @@
+{
+  "name": "rox-vscode-extension",
+  "displayName": "rox-vscode-extension",
+  "description": "Vscode extension for rox language",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.87.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [{
+      "id": "rox",
+      "aliases": ["rox", "rox"],
+      "extensions": [".rox"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "rox",
+      "scopeName": "source.rox",
+      "path": "./syntaxes/rox.tmLanguage.json"
+    }]
+  }
+}

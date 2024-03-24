@@ -1,0 +1,143 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "rox",
+	"patterns": [
+		{
+			"include": "#comments"
+		},
+		{
+			"include": "#keywords"
+		},
+		{
+			"include": "#statements"
+		},
+		{
+			"include": "#callables"
+		},
+		{
+			"include": "#ident"
+		},
+		{
+			"include": "#strings"
+		},
+		{
+			"include": "#digits"
+		}
+	],
+	"repository": {
+		"keywords": {
+			"patterns": [
+				{
+					"name": "keyword.control.rox",
+					"match": "\\b(if|else|while|for|return|and|or)\\b"
+				},
+				{
+					"name": "constant.language.null.rox",
+					"match": "\\b(nil)\\b"
+				},
+				{
+					"name": "constant.language.boolean.rox",
+					"match": "\\b(true|false)\\b"
+				},
+				{
+					"name": "support.function.builtin.rox",
+					"match": "\\b(print)\\b"
+				},
+				{
+					"name": "variable.language.this.rox",
+					"match": "\\b(this)\\b"
+				}
+			]
+		},
+		"statements": {
+			"patterns": [
+				{
+					"match": "\\b(var)\\s+([A-Za-z_][A-Za-z0-9_]*)\\b",
+					"captures": {
+						"1": {
+							"name": "storage.type.rox"
+						},
+						"2": {
+							"name": "support.variable.rox"
+						}
+					}
+				},
+				{
+					"match": "\\b(fun)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\(([A-Za-z0-9_,\\s]*)\\)",
+					"captures": {
+						"1": {
+							"name":"storage.type.function.rox"
+						},
+						"2": {
+							"name":"entity.name.function.rox"
+						},
+						"3": {
+							"patterns": [
+								{
+									"match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b",
+									"name": "variable.parameter.rox"
+								}
+							]
+						}
+					}
+				},
+				{
+					"match": "\\b(class)\\s+([A-Za-z_][A-Za-z0-9_]*)(?:\\s*(<)\\s*([A-Za-z_][A-Za-z0-9_]*))?\\b",
+					"captures": {
+						"1": {
+							"name": "storage.type.class.rox"
+						},
+						"2": {
+							"name": "entity.name.type.class.rox"
+						},
+						"3": {
+							"name": "storage.modifier.rox"
+						},
+						"4": {
+							"name": "entity.name.type.class.rox"
+						}
+					}
+				}
+			]
+		},
+		"callables": {
+			"patterns": [
+				{
+					"match": "([A-Za-z_][A-Za-z0-9_]*)\\(",
+					"name": "support.function.rox"
+				}
+			]
+		},
+		"strings": {
+			"name": "string.quoted.double.rox",
+			"begin": "\"",
+			"end": "\"",
+			"patterns": []
+		},
+		"digits": {
+			"patterns": [
+				{
+					"name": "constant.numeric.rox",
+					"match": "\\b[0-9]+(?:.[0-9]+)?\\b"
+				}
+			]
+		},
+		"ident": {
+			"patterns": [
+				{
+					"name": "variable.other.readwrite.rox",
+					"match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
+				}
+			]
+		},
+		"comments": {
+			"patterns": [
+				{
+					"name": "comment.line.double-slash.rox",
+					"match": "\\/\\/.*"
+				}
+			]
+		}
+	},
+	"scopeName": "source.rox"
+}
