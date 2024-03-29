@@ -1,7 +1,8 @@
-for(var i = 0; i < 3; i = i + 1) {
-    if(i < 10) {
-        print i;
-    } else {
-        return;
-    }
+var i = 0;
+print i;
+print i;
+while( i < 3) {
+    i = i / 0;
 }
+
+print i;

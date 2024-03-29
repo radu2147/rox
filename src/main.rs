@@ -22,9 +22,14 @@ use std::io::Write;
 use std::process::exit;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-fn run(code: String, error_handler: &mut ErrorHandler, env: &mut Environment) {
-    let mut scanner = Scanner::new(code, error_handler);
-    let mut parser = Parser::new(scanner.scan_tokens(), error_handler);
+fn run(code: String, env: &mut Environment) {
+    let mut error_handler = ErrorHandler {
+        had_error: false,
+        content: vec![],
+    };
+    error_handler.set_content(&code);
+    let mut scanner = Scanner::new(code.clone(), &error_handler);
+    let mut parser = Parser::new(scanner.scan_tokens(), &error_handler);
     let mut interpreter = Interpreter {
         ret_val: Value::Nil,
         locals: HashMap::new(),
@@ -42,52 +47,63 @@ fn run(code: String, error_handler: &mut ErrorHandler, env: &mut Environment) {
                 println!("{:?}", e)
             }
         },
-        Err(e) => println!("{:?}", e),
+        Err(e) => error_handler.error(e.line, &e.message),
     }
 }
 
-struct ErrorHandler {
+struct ErrorHandler<'a> {
     had_error: bool,
+    content: Vec<&'a str>,
 }
 
-impl ErrorHandler {
-    fn error(&mut self, line: u32, message: &str) {
+impl<'a> ErrorHandler<'a> {
+    fn error(&self, line: u128, message: &str) {
         self.report(line, "", message);
     }
 
-    fn report(&mut self, line: u32, location: &str, message: &str) {
+    fn report(&self, line: u128, location: &str, message: &str) {
+        let mut error_zone = String::new();
+        let start = {
+            if line > 1 {
+                line - 2
+            } else {
+                line
+            }
+        };
+        for lin in start..(line + 1) {
+            if self.content.len() as u128 > lin {
+                error_zone += &self.content[lin as usize];
+                error_zone += "\n";
+            }
+        }
+        println!("{error_zone}");
         println!("[line {line}] Error {location}: {message}");
-        self.had_error = true;
+    }
+
+    fn set_content(&mut self, content: &'a String) {
+        self.content = content.split("\n").collect::<Vec<&str>>();
     }
 }
 
-fn run_prompt(error_handler: &mut ErrorHandler, env: &mut Environment) {
+fn run_prompt(env: &mut Environment) {
     loop {
         print!("> ");
         std::io::stdout().flush().unwrap();
         let mut line = String::new();
         let length = std::io::stdin().read_line(&mut line).unwrap();
         if length > 0 && line != "".to_string() {
-            run(line, error_handler, env);
-            if error_handler.had_error {
-                exit(65);
-            }
+            run(line, env);
         }
     }
 }
 
-fn run_file(filename: &String, err: &mut ErrorHandler, env: &mut Environment) {
+fn run_file(filename: &String, env: &mut Environment) {
     let contents = fs::read_to_string(filename).expect("Should have been able to read the file");
-
-    run(contents, err, env);
-    if err.had_error {
-        exit(65);
-    }
+    run(contents, env);
 }
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let mut err = ErrorHandler { had_error: false };
     let mut environment = Environment::new();
     environment.define(
         "clock".to_string(),
@@ -107,8 +123,8 @@ fn main() {
         }),
     );
     match args.len() {
-        1 => run_prompt(&mut err, &mut environment),
-        2 => run_file(&args[1], &mut err, &mut environment),
+        1 => run_prompt(&mut environment),
+        2 => run_file(&args[1], &mut environment),
         _ => panic!("Wrong use of the interpreter"),
     }
 }

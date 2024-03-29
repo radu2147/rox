@@ -1,60 +1,65 @@
 use std::fmt::Display;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Token {
-    LeftParen(String, i32),
-    RightParen(String, i32),
-    LeftBrace(String, i32),
-    RightBrace(String, i32),
-    Comma(String, i32),
-    Dot(String, i32),
-    Minus(String, i32),
-    Plus(String, i32),
-    Semicolon(String, i32),
-    Slash(String, i32),
-    Star(String, i32),
-    Bang(String, i32),
-    BangEqual(String, i32),
-    Equal(String, i32),
-    EqualEqual(String, i32),
-    Grater(String, i32),
-    GraterEqual(String, i32),
-    Less(String, i32),
-    LessEqual(String, i32),
-    Identifier(String, String, i32),
-    String(String, String, i32),
-    Number(String, f32, i32),
-    And(String, i32),
-    Or(String, i32),
-    Class(String, i32),
-    If(String, i32),
-    Else(String, i32),
-    Fun(String, i32),
-    For(String, i32),
-    Nil(String, i32),
-    Print(String, i32),
-    Return(String, i32),
-    Super(String, i32),
-    This(String, i32),
-    True(String, i32),
-    False(String, i32),
-    Var(String, i32),
-    While(String, i32),
-    Break(i32),
-    Eof(String, i32),
+pub struct Token {
+    pub line: u128,
+    pub typ: TokenType,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum TokenType {
+    LeftParen,
+    RightParen,
+    LeftBrace,
+    RightBrace,
+    Comma,
+    Dot,
+    Minus,
+    Plus,
+    Semicolon,
+    Slash,
+    Star,
+    Bang,
+    BangEqual,
+    Equal,
+    EqualEqual,
+    Grater,
+    GraterEqual,
+    Less,
+    LessEqual,
+    Identifier(String, String),
+    String(String),
+    Number(f32),
+    And,
+    Or,
+    Class,
+    If,
+    Else,
+    Fun,
+    For,
+    Nil,
+    Print,
+    Return,
+    This(String),
+    True,
+    False,
+    Var,
+    While,
+    Break,
+    Eof,
 }
 
 impl Token {
     pub fn get_variable(&self) -> Variable {
-        match self {
-            Token::Identifier(name, id, line) => Variable {
+        match &self.typ {
+            TokenType::Identifier(name, id) => Variable {
                 name: name.clone(),
-                line: line.clone(),
+                line: self.line,
                 id: id.clone(),
             },
-            Token::This(name, line) => Variable {
+            TokenType::This(name) => Variable {
                 name: name.clone(),
-                line: line.clone(),
+                line: self.line,
                 id: "1".to_string(),
             },
             _ => panic!("Not a variable"),
@@ -65,6 +70,6 @@ impl Token {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Variable {
     pub name: String,
-    pub line: i32,
+    pub line: u128,
     pub id: String,
 }

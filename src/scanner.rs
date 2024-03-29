@@ -1,14 +1,14 @@
-use crate::types::Token;
+use crate::types::{Token, TokenType};
 use crate::ErrorHandler;
 use uuid::Uuid;
 
 pub struct Scanner<'a> {
     pub source: String,
-    pub error_handler: &'a mut ErrorHandler,
+    pub error_handler: &'a ErrorHandler<'a>,
     tokens: Vec<Token>,
     start: i32,
     current: i32,
-    line: i32,
+    line: u128,
 }
 
 impl<'a> Scanner<'a> {
@@ -17,63 +17,106 @@ impl<'a> Scanner<'a> {
             self.start = self.current;
             self.scan_token();
         }
-        self.tokens.push(Token::Eof("".to_string(), self.line));
+        self.tokens.push(Token {
+            typ: TokenType::Eof,
+            line: self.line.clone(),
+        });
         self.tokens
     }
 
     fn scan_token(&mut self) {
         let c = self.advance();
         match c {
-            '(' => self
-                .tokens
-                .push(Token::LeftBrace("".to_string(), self.line)),
-            ')' => self
-                .tokens
-                .push(Token::RightBrace("".to_string(), self.line)),
-            '{' => self
-                .tokens
-                .push(Token::LeftParen("".to_string(), self.line)),
-            '}' => self
-                .tokens
-                .push(Token::RightParen("".to_string(), self.line)),
-            ',' => self.tokens.push(Token::Comma("".to_string(), self.line)),
-            '.' => self.tokens.push(Token::Dot("".to_string(), self.line)),
-            '+' => self.tokens.push(Token::Plus("".to_string(), self.line)),
-            '-' => self.tokens.push(Token::Minus("".to_string(), self.line)),
-            '*' => self.tokens.push(Token::Star("".to_string(), self.line)),
-            ';' => self
-                .tokens
-                .push(Token::Semicolon("".to_string(), self.line)),
+            '(' => self.tokens.push(Token {
+                typ: TokenType::LeftBrace,
+                line: self.line,
+            }),
+            ')' => self.tokens.push(Token {
+                typ: TokenType::RightBrace,
+                line: self.line,
+            }),
+            '{' => self.tokens.push(Token {
+                typ: TokenType::LeftParen,
+                line: self.line,
+            }),
+            '}' => self.tokens.push(Token {
+                typ: TokenType::RightParen,
+                line: self.line,
+            }),
+            ',' => self.tokens.push(Token {
+                typ: TokenType::Comma,
+                line: self.line,
+            }),
+            '.' => self.tokens.push(Token {
+                typ: TokenType::Dot,
+                line: self.line,
+            }),
+            '+' => self.tokens.push(Token {
+                typ: TokenType::Plus,
+                line: self.line,
+            }),
+            '-' => self.tokens.push(Token {
+                typ: TokenType::Minus,
+                line: self.line,
+            }),
+            '*' => self.tokens.push(Token {
+                typ: TokenType::Star,
+                line: self.line,
+            }),
+            ';' => self.tokens.push(Token {
+                typ: TokenType::Semicolon,
+                line: self.line,
+            }),
             '!' => {
                 if self.match_char('=') {
-                    self.tokens
-                        .push(Token::BangEqual("".to_string(), self.line))
+                    self.tokens.push(Token {
+                        typ: TokenType::BangEqual,
+                        line: self.line,
+                    })
                 } else {
-                    self.tokens.push(Token::Bang("".to_string(), self.line))
+                    self.tokens.push(Token {
+                        typ: TokenType::Bang,
+                        line: self.line,
+                    })
                 }
             }
             '=' => {
                 if self.match_char('=') {
-                    self.tokens
-                        .push(Token::EqualEqual("".to_string(), self.line))
+                    self.tokens.push(Token {
+                        typ: TokenType::EqualEqual,
+                        line: self.line,
+                    })
                 } else {
-                    self.tokens.push(Token::Equal("".to_string(), self.line))
+                    self.tokens.push(Token {
+                        typ: TokenType::Equal,
+                        line: self.line,
+                    })
                 }
             }
             '>' => {
                 if self.match_char('=') {
-                    self.tokens
-                        .push(Token::GraterEqual("".to_string(), self.line))
+                    self.tokens.push(Token {
+                        typ: TokenType::GraterEqual,
+                        line: self.line,
+                    })
                 } else {
-                    self.tokens.push(Token::Grater("".to_string(), self.line))
+                    self.tokens.push(Token {
+                        typ: TokenType::Grater,
+                        line: self.line,
+                    })
                 }
             }
             '<' => {
                 if self.match_char('=') {
-                    self.tokens
-                        .push(Token::LessEqual("".to_string(), self.line))
+                    self.tokens.push(Token {
+                        typ: TokenType::LessEqual,
+                        line: self.line,
+                    })
                 } else {
-                    self.tokens.push(Token::Less("".to_string(), self.line))
+                    self.tokens.push(Token {
+                        typ: TokenType::Less,
+                        line: self.line,
+                    })
                 }
             }
             '/' => {
@@ -85,7 +128,10 @@ impl<'a> Scanner<'a> {
                         self.advance();
                     }
                 } else {
-                    self.tokens.push(Token::Slash("".to_string(), self.line))
+                    self.tokens.push(Token {
+                        typ: TokenType::Slash,
+                        line: self.line,
+                    })
                 }
             }
             ' ' | '\t' | '\r' => {}
@@ -116,11 +162,10 @@ impl<'a> Scanner<'a> {
                         }
                     }
                 }
-                self.tokens.push(Token::Number(
-                    "".to_string(),
-                    number_literal.parse::<f32>().unwrap(),
-                    self.line,
-                ))
+                self.tokens.push(Token {
+                    typ: TokenType::Number(number_literal.parse::<f32>().unwrap()),
+                    line: self.line,
+                })
             }
             'a' | 'A' | 'b' | 'B' | 'c' | 'C' | 'd' | 'D' | 'e' | 'E' | 'f' | 'F' | 'g' | 'G'
             | 'h' | 'H' | 'i' | 'I' | 'j' | 'J' | 'k' | 'K' | 'l' | 'L' | 'm' | 'M' | 'n' | 'N'
@@ -139,11 +184,10 @@ impl<'a> Scanner<'a> {
                 if let Some(tok) = self.get_keyword_token(&identifier_string, self.line) {
                     self.tokens.push(tok)
                 } else {
-                    self.tokens.push(Token::Identifier(
-                        identifier_string,
-                        Uuid::new_v4().to_string(),
-                        self.line,
-                    ))
+                    self.tokens.push(Token {
+                        typ: TokenType::Identifier(identifier_string, Uuid::new_v4().to_string()),
+                        line: self.line,
+                    })
                 }
             }
             '\n' => self.line += 1,
@@ -160,39 +204,85 @@ impl<'a> Scanner<'a> {
                     self.advance();
                 }
                 if self.is_at_end() {
-                    self.error_handler
-                        .error(self.line as u32, "Unterminated string");
+                    self.error_handler.error(self.line, "Unterminated string");
                     return;
                 }
                 self.advance();
-                self.tokens
-                    .push(Token::String("".to_string(), string_literal, self.line));
+                self.tokens.push(Token {
+                    typ: TokenType::String(string_literal),
+                    line: self.line,
+                });
             }
-            _ => self
-                .error_handler
-                .error(self.line as u32, "Unexpected character."),
+            _ => self.error_handler.error(self.line, "Unexpected character."),
         };
     }
 
-    fn get_keyword_token(&self, identifier_string: &str, line: i32) -> Option<Token> {
+    fn get_keyword_token(&self, identifier_string: &str, line: u128) -> Option<Token> {
         match identifier_string {
-            "if" => Some(Token::If("".to_string(), line)),
-            "else" => Some(Token::Else("".to_string(), line)),
-            "print" => Some(Token::Print("".to_string(), line)),
-            "and" => Some(Token::And("".to_string(), line)),
-            "or" => Some(Token::Or("".to_string(), line)),
-            "class" => Some(Token::Class("".to_string(), line)),
-            "nil" => Some(Token::Nil("".to_string(), line)),
-            "for" => Some(Token::For("".to_string(), line)),
-            "while" => Some(Token::While("".to_string(), line)),
-            "return" => Some(Token::Return("".to_string(), line)),
-            "super" => Some(Token::Super("".to_string(), line)),
-            "this" => Some(Token::This("".to_string(), line)),
-            "true" => Some(Token::True("".to_string(), line)),
-            "false" => Some(Token::False("".to_string(), line)),
-            "var" => Some(Token::Var("".to_string(), line)),
-            "fun" => Some(Token::Fun("".to_string(), line)),
-            "break" => Some(Token::Break(line)),
+            "if" => Some(Token {
+                typ: TokenType::If,
+                line,
+            }),
+            "else" => Some(Token {
+                typ: TokenType::Else,
+                line,
+            }),
+            "print" => Some(Token {
+                typ: TokenType::Print,
+                line,
+            }),
+            "and" => Some(Token {
+                typ: TokenType::And,
+                line,
+            }),
+            "or" => Some(Token {
+                typ: TokenType::Or,
+                line,
+            }),
+            "class" => Some(Token {
+                typ: TokenType::Class,
+                line,
+            }),
+            "nil" => Some(Token {
+                typ: TokenType::Nil,
+                line,
+            }),
+            "for" => Some(Token {
+                typ: TokenType::For,
+                line,
+            }),
+            "while" => Some(Token {
+                typ: TokenType::While,
+                line,
+            }),
+            "return" => Some(Token {
+                typ: TokenType::Return,
+                line,
+            }),
+            "this" => Some(Token {
+                typ: TokenType::This(Uuid::new_v4().to_string()),
+                line,
+            }),
+            "true" => Some(Token {
+                typ: TokenType::True,
+                line,
+            }),
+            "false" => Some(Token {
+                typ: TokenType::False,
+                line,
+            }),
+            "var" => Some(Token {
+                typ: TokenType::Var,
+                line,
+            }),
+            "fun" => Some(Token {
+                typ: TokenType::Fun,
+                line,
+            }),
+            "break" => Some(Token {
+                typ: TokenType::Break,
+                line,
+            }),
             _ => None,
         }
     }
@@ -247,7 +337,7 @@ impl<'a> Scanner<'a> {
         self.current >= self.source.len() as i32
     }
 
-    pub fn new(source: String, error_handler: &'a mut ErrorHandler) -> Self {
+    pub fn new(source: String, error_handler: &'a ErrorHandler<'a>) -> Self {
         Self {
             source,
             error_handler,

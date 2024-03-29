@@ -1,6 +1,6 @@
 use crate::environment::Environment;
 use crate::expression_visitor::Visitor;
-use crate::types::Token;
+use crate::types::{Token, TokenType};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
@@ -101,20 +101,20 @@ pub enum Operator {
 
 impl Operator {
     pub fn from(token: &Token) -> Self {
-        match token {
-            Token::Plus(_, _) => Operator::Plus,
-            Token::Minus(_, _) => Operator::Minus,
-            Token::Star(_, _) => Operator::Mul,
-            Token::Slash(_, _) => Operator::Div,
-            Token::GraterEqual(_, _) => Operator::GE,
-            Token::LessEqual(_, _) => Operator::LE,
-            Token::Less(_, _) => Operator::Less,
-            Token::Grater(_, _) => Operator::Greater,
-            Token::EqualEqual(_, _) => Operator::EQ,
-            Token::BangEqual(_, _) => Operator::NotEqual,
-            Token::Bang(_, _) => Operator::Not,
-            Token::And(_, _) => Operator::And,
-            Token::Or(_, _) => Operator::Or,
+        match token.typ {
+            TokenType::Plus => Operator::Plus,
+            TokenType::Minus => Operator::Minus,
+            TokenType::Star => Operator::Mul,
+            TokenType::Slash => Operator::Div,
+            TokenType::GraterEqual => Operator::GE,
+            TokenType::LessEqual => Operator::LE,
+            TokenType::Less => Operator::Less,
+            TokenType::Grater => Operator::Greater,
+            TokenType::EqualEqual => Operator::EQ,
+            TokenType::BangEqual => Operator::NotEqual,
+            TokenType::Bang => Operator::Not,
+            TokenType::And => Operator::And,
+            TokenType::Or => Operator::Or,
             _ => panic!("Unknown operator {:?}", token),
         }
     }
