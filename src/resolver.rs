@@ -1,6 +1,6 @@
 use crate::ast_types::{
-    AssignmentExpression, BinaryExpression, CallExpression, Expression, GroupExpression,
-    Identifier, MemberExpression, SetMemberExpression, ThisExpression, UnaryExpression,
+    AssignmentExpression, BinaryExpression, CallExpression, GroupExpression, Identifier,
+    MemberExpression, ThisExpression, UnaryExpression,
 };
 use crate::environment::Environment;
 use crate::expression_visitor::Visitor;
@@ -8,9 +8,9 @@ use crate::interpreter::Interpreter;
 use crate::statement_visitor::StatementVisitor;
 use crate::stmt::{
     BlockStatement, ClassDeclaration, ExpressionStatement, FunctionDeclaration, IfStatement,
-    PrintStatement, ReturnStatement, Stmt, VariableDeclarationStatement, WhileStatement,
+    PrintStatement, ReturnStatement, Statement, Stmt, VariableDeclarationStatement, WhileStatement,
 };
-use crate::types::Token;
+use crate::types::{Location, Token};
 use std::collections::HashMap;
 
 pub struct Resolver<'a> {
@@ -20,6 +20,7 @@ pub struct Resolver<'a> {
     current_function: FunctionType,
     current_type: ClassType,
     is_loop: bool,
+    location: Location,
 }
 
 #[derive(Clone, PartialEq)]
@@ -31,7 +32,9 @@ pub enum FunctionType {
 
 #[derive(Debug)]
 pub struct ResolverError {
-    message: String,
+    pub message: String,
+    pub from: u128,
+    pub to: u128,
 }
 
 #[derive(Clone, PartialEq)]
@@ -49,15 +52,16 @@ impl<'a> Resolver<'a> {
             current_function: FunctionType::None,
             current_type: ClassType::None,
             is_loop: false,
+            location: Location { from: 0, to: 0 },
         }
     }
 
     pub fn resolve(
         &mut self,
         env: &mut Environment,
-        stmts: &mut Vec<Stmt>,
+        stmts: &mut Vec<Statement>,
     ) -> Result<(), ResolverError> {
-        for mut stmt in stmts {
+        for stmt in stmts {
             stmt.accept(self, env)?;
         }
 
@@ -74,7 +78,7 @@ impl<'a> Resolver<'a> {
         self.current_function = typ;
 
         self.begin_scope();
-        for mut param in &mut func_dec.params {
+        for param in &mut func_dec.params {
             self.declare(&param.get_name());
             self.define(&param.get_name());
             param.accept(self, env)?;
@@ -129,27 +133,23 @@ impl<'a> Resolver<'a> {
 }
 
 impl Visitor<(), ResolverError> for Resolver<'_> {
+    fn set_current_location(&mut self, location: Location) {
+        self.location = location;
+    }
+
     fn visit_this_expression(
         &mut self,
         expr: &mut ThisExpression,
-        env: &mut Environment,
+        _env: &mut Environment,
     ) -> Result<(), ResolverError> {
         if self.current_type == ClassType::None {
             return Err(ResolverError {
                 message: "This statement not allowed outside class scope".to_string(),
+                from: self.location.from,
+                to: self.location.to,
             });
         }
         self.resolve_local(&expr.keyword);
-        Ok(())
-    }
-
-    fn visit_set_member_expression(
-        &mut self,
-        expr: &mut SetMemberExpression,
-        env: &mut Environment,
-    ) -> Result<(), ResolverError> {
-        expr.value.accept(self, env)?;
-        expr.object.accept(self, env)?;
         Ok(())
     }
 
@@ -159,7 +159,7 @@ impl Visitor<(), ResolverError> for Resolver<'_> {
         env: &mut Environment,
     ) -> Result<(), ResolverError> {
         expr.callee.accept(self, env)?;
-        for mut arg in &mut expr.arguments {
+        for arg in &mut expr.arguments {
             arg.accept(self, env)?;
         }
         Ok(())
@@ -223,18 +223,24 @@ impl Visitor<(), ResolverError> for Resolver<'_> {
 
     fn visit_nil_literal(&self) -> () {}
 
-    fn visit_string_literal(&self, expr: &String) -> () {}
+    fn visit_string_literal(&self, _expr: &String) -> () {}
 
-    fn visit_number_literal(&self, expr: &f32) -> () {}
+    fn visit_number_literal(&self, _expr: &f32) -> () {}
 
-    fn visit_bool_literal(&self, expr: &bool) -> () {}
+    fn visit_bool_literal(&self, _expr: &bool) -> () {}
 }
 
 impl StatementVisitor<(), ResolverError> for Resolver<'_> {
+    fn set_current_location(&mut self, location: Location) {
+        self.location = location;
+    }
+
     fn visit_break_statement(&mut self, _env: &mut Environment) -> Result<(), ResolverError> {
         if !self.is_loop {
             return Err(ResolverError {
                 message: "Forbidden use of break statement".to_string(),
+                from: self.location.from,
+                to: self.location.to,
             });
         }
 
@@ -256,14 +262,14 @@ impl StatementVisitor<(), ResolverError> for Resolver<'_> {
         self.define(&"this".to_string());
 
         for var in &mut class_declaration.fields {
-            if let Stmt::VarDeclarationStatement(func_dec) = var {
+            if let Stmt::VarDeclarationStatement(func_dec) = &mut var.typ {
                 self.declare(&func_dec.name);
                 func_dec.initializer.accept(self, env)?;
                 self.define(&func_dec.name);
             }
         }
         for method in &mut class_declaration.methods {
-            if let Stmt::FunctionDeclaration(func_dec) = method {
+            if let Stmt::FunctionDeclaration(func_dec) = &mut method.typ {
                 self.resolve_function(func_dec, env, FunctionType::Method)?;
             }
         }
@@ -310,6 +316,8 @@ impl StatementVisitor<(), ResolverError> for Resolver<'_> {
         if self.current_function == FunctionType::None {
             return Err(ResolverError {
                 message: "Return statement not allowed here".to_string(),
+                from: self.location.from,
+                to: self.location.to,
             });
         }
         if return_stmt.return_expression.is_some() {
@@ -352,7 +360,7 @@ impl StatementVisitor<(), ResolverError> for Resolver<'_> {
         env: &mut Environment,
     ) -> Result<(), ResolverError> {
         self.begin_scope();
-        for mut stmt in &mut decl.statements {
+        for stmt in &mut decl.statements {
             stmt.accept(self, env)?;
         }
         self.end_scope();

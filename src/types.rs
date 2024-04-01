@@ -1,5 +1,3 @@
-use std::fmt::Display;
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct Token {
     pub line: u128,
@@ -72,4 +70,10 @@ pub struct Variable {
     pub name: String,
     pub line: u128,
     pub id: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct Location {
+    pub(crate) from: u128,
+    pub(crate) to: u128,
 }

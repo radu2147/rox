@@ -15,24 +15,22 @@ use crate::interpreter::{Callable, Interpreter, Value};
 use crate::parser::Parser;
 use crate::resolver::Resolver;
 use crate::scanner::Scanner;
+use crate::types::Location;
 use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::io::Write;
-use std::process::exit;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn run(code: String, env: &mut Environment) {
-    let mut error_handler = ErrorHandler {
-        had_error: false,
-        content: vec![],
-    };
+    let mut error_handler = ErrorHandler { content: vec![] };
     error_handler.set_content(&code);
     let mut scanner = Scanner::new(code.clone(), &error_handler);
     let mut parser = Parser::new(scanner.scan_tokens(), &error_handler);
     let mut interpreter = Interpreter {
         ret_val: Value::Nil,
         locals: HashMap::new(),
+        location: Location { from: 0, to: 0 },
     };
     let mut resolver = Resolver::new(&mut interpreter);
     match parser.parse_program() {
@@ -40,11 +38,11 @@ fn run(code: String, env: &mut Environment) {
             Ok(()) => match interpreter.interpret(&mut t, env) {
                 Ok(_) => {}
                 Err(e) => {
-                    println!("{:?}", e);
+                    error_handler.log_error(e.from, e.to, &e.message);
                 }
             },
             Err(e) => {
-                println!("{:?}", e)
+                error_handler.log_error(e.from, e.to, &e.message);
             }
         },
         Err(e) => error_handler.error(e.line, &e.message),
@@ -52,13 +50,43 @@ fn run(code: String, env: &mut Environment) {
 }
 
 struct ErrorHandler<'a> {
-    had_error: bool,
     content: Vec<&'a str>,
 }
 
 impl<'a> ErrorHandler<'a> {
     fn error(&self, line: u128, message: &str) {
         self.report(line, "", message);
+    }
+
+    fn log_error(&self, from: u128, to: u128, message: &str) {
+        let mut error_zone = String::new();
+        let start = {
+            if from > 1 {
+                from - 2
+            } else {
+                from
+            }
+        };
+
+        let end = {
+            if to < self.content.len() as u128 - 1 {
+                to + 1
+            } else {
+                self.content.len() as u128
+            }
+        };
+
+        for lin in (start - 1)..end {
+            if self.content.len() as u128 > lin {
+                error_zone += &format!("{}| {}\n", lin + 1, self.content[lin as usize]);
+            }
+        }
+        println!("{error_zone}");
+        if from == to {
+            println!("[line {from}] Error: {message}");
+        } else {
+            println!("[line {from}-{to}] Error: {message}");
+        }
     }
 
     fn report(&self, line: u128, location: &str, message: &str) {

@@ -1,15 +1,15 @@
 use crate::ast_types::{
     AssignmentExpression, BinaryExpression, CallExpression, Expression, GroupExpression,
-    Identifier, MemberExpression, Operator, SetMemberExpression, ThisExpression, UnaryExpression,
+    Identifier, MemberExpression, Operator, ThisExpression, UnaryExpression,
 };
 use crate::environment::Environment;
 use crate::expression_visitor::Visitor;
 use crate::statement_visitor::StatementVisitor;
 use crate::stmt::{
     BlockStatement, ClassDeclaration, ExpressionStatement, FunctionDeclaration, IfStatement,
-    PrintStatement, ReturnStatement, Stmt, VariableDeclarationStatement, WhileStatement,
+    PrintStatement, ReturnStatement, Statement, Stmt, VariableDeclarationStatement, WhileStatement,
 };
-use crate::types::{Token, Variable};
+use crate::types::{Location, Token, Variable};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::ops::Add;
@@ -19,6 +19,8 @@ pub struct RunTimeError {
     pub message: String,
     pub return_error: bool,
     pub loop_break: bool,
+    pub from: u128,
+    pub to: u128,
 }
 
 #[derive(Debug, Clone)]
@@ -64,19 +66,9 @@ impl RoxClass {
         args: Vec<Value>,
     ) -> Result<Value, RunTimeError> {
         let method = self.methods.get("constructor");
-        if let Some(mut init_method) = method {
+        if let Some(init_method) = method {
             let mut end_class = self.clone();
             for (index, param) in init_method.params.iter().enumerate() {
-                if end_class.fields.contains_key(&param.get_name()) {
-                    return Err(RunTimeError {
-                        message: format!(
-                            "Property {} already defined on instance",
-                            param.get_name().clone()
-                        ),
-                        return_error: false,
-                        loop_break: false,
-                    });
-                }
                 end_class
                     .fields
                     .insert(param.get_name(), args.get(index).unwrap().clone());
@@ -102,7 +94,7 @@ impl RoxClass {
 #[derive(Debug, Clone)]
 pub struct Callable {
     pub arity: u8,
-    pub body: Option<Stmt>,
+    pub body: Option<Statement>,
     pub params: Vec<Expression>,
     pub closure: Environment,
     pub std_call:
@@ -185,7 +177,7 @@ impl Value {
         }
     }
 
-    pub fn get_number(&self) -> Result<&f32, RunTimeError> {
+    pub fn get_number(&self, interpreter: &Interpreter) -> Result<&f32, RunTimeError> {
         match self {
             Self::Number(x) => {
                 return Ok(x);
@@ -195,12 +187,14 @@ impl Value {
                     message: format!("Value {self} is not a number").to_string(),
                     return_error: false,
                     loop_break: false,
+                    from: interpreter.location.from,
+                    to: interpreter.location.to,
                 });
             }
         }
     }
 
-    pub fn get_string(&self) -> Result<&String, RunTimeError> {
+    pub fn get_string(&self, interpreter: &Interpreter) -> Result<&String, RunTimeError> {
         match self {
             Self::String(x) => {
                 return Ok(x);
@@ -210,18 +204,22 @@ impl Value {
                     message: format!("Value {self} is not a string").to_string(),
                     return_error: false,
                     loop_break: false,
+                    from: interpreter.location.from,
+                    to: interpreter.location.to,
                 });
             }
         }
     }
 
-    pub fn get_boolean(&self) -> Result<&bool, RunTimeError> {
+    pub fn get_boolean(&self, interpreter: &Interpreter) -> Result<&bool, RunTimeError> {
         return match self {
             Self::Bool(x) => Ok(x),
             _ => Err(RunTimeError {
                 message: format!("Value {self} is not a bool").to_string(),
                 return_error: false,
                 loop_break: false,
+                from: interpreter.location.from,
+                to: interpreter.location.to,
             }),
         };
     }
@@ -237,12 +235,13 @@ impl Value {
 pub struct Interpreter {
     pub ret_val: Value,
     pub locals: HashMap<Variable, u32>,
+    pub location: Location,
 }
 
 impl Interpreter {
     pub fn interpret(
         &mut self,
-        stmts: &mut Vec<Stmt>,
+        stmts: &mut Vec<Statement>,
         env: &mut Environment,
     ) -> Result<(), RunTimeError> {
         for stmt in stmts {
@@ -257,11 +256,17 @@ impl Interpreter {
 }
 
 impl StatementVisitor<(), RunTimeError> for Interpreter {
+    fn set_current_location(&mut self, location: Location) {
+        self.location = location;
+    }
+
     fn visit_break_statement(&mut self, _env: &mut Environment) -> Result<(), RunTimeError> {
         Err(RunTimeError {
             message: "".to_string(),
             return_error: false,
             loop_break: true,
+            from: self.location.from,
+            to: self.location.to,
         })
     }
 
@@ -273,7 +278,7 @@ impl StatementVisitor<(), RunTimeError> for Interpreter {
         let mut methods = HashMap::new();
         let mut fields = HashMap::new();
         for field in &mut class_declaration.fields {
-            if let Stmt::VarDeclarationStatement(func_dec) = field {
+            if let Stmt::VarDeclarationStatement(func_dec) = &mut field.typ {
                 fields.insert(
                     func_dec.name.clone(),
                     func_dec.initializer.accept(self, env)?,
@@ -281,7 +286,7 @@ impl StatementVisitor<(), RunTimeError> for Interpreter {
             }
         }
         for method in &mut class_declaration.methods {
-            if let Stmt::FunctionDeclaration(func_dec) = method {
+            if let Stmt::FunctionDeclaration(func_dec) = &mut method.typ {
                 methods.insert(
                     func_dec.name.clone(),
                     Callable::from_node(func_dec, env.clone()),
@@ -342,6 +347,8 @@ impl StatementVisitor<(), RunTimeError> for Interpreter {
         self.ret_val = value;
         Err(RunTimeError {
             message: "".to_string(),
+            from: self.location.from,
+            to: self.location.to,
             return_error: true,
             loop_break: false,
         })
@@ -387,7 +394,7 @@ impl StatementVisitor<(), RunTimeError> for Interpreter {
         env: &mut Environment,
     ) -> Result<(), RunTimeError> {
         let mut child_env = env.extend();
-        for mut stmt in &mut decl.statements {
+        for stmt in &mut decl.statements {
             stmt.accept(self, &mut child_env)?;
         }
         return Ok(());
@@ -413,36 +420,32 @@ impl StatementVisitor<(), RunTimeError> for Interpreter {
 }
 
 impl Visitor<Value, RunTimeError> for Interpreter {
+    fn set_current_location(&mut self, location: Location) {
+        self.location = location;
+    }
+
     fn visit_this_expression(
         &mut self,
         expr: &mut ThisExpression,
         env: &mut Environment,
     ) -> Result<Value, RunTimeError> {
         let dist = self.locals.get(&expr.keyword.get_variable());
-        if dist.is_some() {
+        let val = if dist.is_some() {
             env.get_at(&"this".to_string(), dist.unwrap())
         } else {
-            Ok(env.get(&"this".to_string())?.clone())
-        }
-    }
+            env.get(&"this".to_string())
+        };
 
-    fn visit_set_member_expression(
-        &mut self,
-        expr: &mut SetMemberExpression,
-        env: &mut Environment,
-    ) -> Result<Value, RunTimeError> {
-        let mut obj = expr.object.accept(self, env)?;
-        let name = expr.name.get_variable().name;
-        let value = expr.value.accept(self, env)?;
-        if let Value::Instance(ref mut inst) = obj {
-            inst.fields.insert(name, value.clone());
-            return Ok(value.clone());
+        match val {
+            Ok(vl) => Ok(vl),
+            Err(e) => Err(RunTimeError {
+                message: e.message,
+                loop_break: false,
+                return_error: false,
+                from: self.location.from,
+                to: self.location.to,
+            }),
         }
-        Err(RunTimeError {
-            message: "Undefined variable".to_string(),
-            return_error: false,
-            loop_break: false,
-        })
     }
 
     fn visit_call_expression(
@@ -467,12 +470,14 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                     .to_string(),
                     return_error: false,
                     loop_break: false,
+                    from: self.location.from,
+                    to: self.location.to,
                 });
             }
 
             return Ok(callable.call(self, args)?);
         }
-        if let Value::Class(mut class) = callable {
+        if let Value::Class(class) = callable {
             let mut args = Vec::new();
             for arg in &mut expr.arguments {
                 args.push(arg.accept(self, env)?);
@@ -483,6 +488,8 @@ impl Visitor<Value, RunTimeError> for Interpreter {
             message: "Expression not callable".to_string(),
             return_error: false,
             loop_break: false,
+            from: self.location.from,
+            to: self.location.to,
         });
     }
 
@@ -492,7 +499,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
         env: &mut Environment,
     ) -> Result<Value, RunTimeError> {
         let instance = expr.object.accept(self, env)?;
-        if let Value::Instance(mut instance) = instance {
+        if let Value::Instance(instance) = instance {
             let mut mthd = instance.class.methods.get(&expr.name.get_variable().name);
             if let Some(ref mut method) = mthd {
                 let value = method.clone().bind(&instance).clone();
@@ -506,6 +513,8 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                     message: format!("No such field for {}", instance.to_string()).to_string(),
                     return_error: false,
                     loop_break: false,
+                    from: self.location.from,
+                    to: self.location.to,
                 });
             }
         }
@@ -514,6 +523,8 @@ impl Visitor<Value, RunTimeError> for Interpreter {
             message: "Object is not a class".to_string(),
             return_error: false,
             loop_break: false,
+            from: self.location.from,
+            to: self.location.to,
         });
     }
 
@@ -524,12 +535,22 @@ impl Visitor<Value, RunTimeError> for Interpreter {
     ) -> Result<Value, RunTimeError> {
         let val = expr.asignee.accept(self, env)?;
         let dist = self.locals.get(&expr.name.get_variable());
-        if dist.is_some() {
-            env.assign_at(expr.name.get_variable().name, val.clone(), dist.unwrap())?;
+        let rez = if dist.is_some() {
+            env.assign_at(expr.name.get_variable().name, val.clone(), dist.unwrap())
         } else {
-            env.assign(expr.name.get_variable().name, val.clone())?;
+            env.assign(expr.name.get_variable().name, val.clone())
+        };
+
+        match rez {
+            Ok(_) => Ok(val),
+            Err(e) => Err(RunTimeError {
+                message: e.message,
+                loop_break: false,
+                return_error: false,
+                from: self.location.from,
+                to: self.location.to,
+            }),
         }
-        Ok(val)
     }
 
     fn visit_binary_expression(
@@ -542,22 +563,24 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                 let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env);
                 let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env);
                 Ok(Value::Number(
-                    value_left?.get_number()? / value_right?.get_number()?,
+                    value_left?.get_number(self)? / value_right?.get_number(self)?,
                 ))
             }
             Operator::Plus => {
                 let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env)?;
                 let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
                 match value_left {
-                    Value::Number(el) => Ok(Value::Number(value_right.get_number()? + el)),
-                    Value::String(st) => {
-                        Ok(Value::String(st.add(value_right.get_string()?.as_str())))
-                    }
+                    Value::Number(el) => Ok(Value::Number(value_right.get_number(self)? + el)),
+                    Value::String(st) => Ok(Value::String(
+                        st.add(value_right.get_string(self)?.as_str()),
+                    )),
                     _ => Err(RunTimeError {
                         message: "Cannot add 2 values that are not both strings or numbers"
                             .to_string(),
                         return_error: false,
                         loop_break: false,
+                        from: self.location.from,
+                        to: self.location.to,
                     }),
                 }
             }
@@ -565,25 +588,29 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                 let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env);
                 let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env);
                 Ok(Value::Number(
-                    value_left?.get_number()? - value_right?.get_number()?,
+                    value_left?.get_number(self)? - value_right?.get_number(self)?,
                 ))
             }
             Operator::Mul => {
                 let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env);
                 let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env);
                 Ok(Value::Number(
-                    value_left?.get_number()? * value_right?.get_number()?,
+                    value_left?.get_number(self)? * value_right?.get_number(self)?,
                 ))
             }
             Operator::EQ => {
                 let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env)?;
                 let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
                 match value_left {
-                    Value::Number(nr) => Ok(Value::Bool(nr == value_right.get_number()?.clone())),
-                    Value::String(str_l) => {
-                        Ok(Value::Bool(str_l == value_right.get_string()?.clone()))
+                    Value::Number(nr) => {
+                        Ok(Value::Bool(nr == value_right.get_number(self)?.clone()))
                     }
-                    Value::Bool(vl) => Ok(Value::Bool(vl == value_right.get_boolean()?.clone())),
+                    Value::String(str_l) => {
+                        Ok(Value::Bool(str_l == value_right.get_string(self)?.clone()))
+                    }
+                    Value::Bool(vl) => {
+                        Ok(Value::Bool(vl == value_right.get_boolean(self)?.clone()))
+                    }
                     Value::Nil => Ok(Value::Bool(value_right.is_nil())),
                     _ => Ok(Value::Bool(false)),
                 }
@@ -592,11 +619,15 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                 let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env)?;
                 let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
                 match value_left {
-                    Value::Number(nr) => Ok(Value::Bool(nr != value_right.get_number()?.clone())),
-                    Value::String(str_l) => {
-                        Ok(Value::Bool(str_l != value_right.get_string()?.clone()))
+                    Value::Number(nr) => {
+                        Ok(Value::Bool(nr != value_right.get_number(self)?.clone()))
                     }
-                    Value::Bool(vl) => Ok(Value::Bool(vl != value_right.get_boolean()?.clone())),
+                    Value::String(str_l) => {
+                        Ok(Value::Bool(str_l != value_right.get_string(self)?.clone()))
+                    }
+                    Value::Bool(vl) => {
+                        Ok(Value::Bool(vl != value_right.get_boolean(self)?.clone()))
+                    }
                     Value::Nil => Ok(Value::Bool(!value_right.is_nil())),
                     _ => Ok(Value::Bool(false)),
                 }
@@ -606,10 +637,10 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                 let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
                 match value_left {
                     Value::Number(nr) => {
-                        Ok(Value::Bool(nr >= value_right.get_number()?.clone()))
+                        Ok(Value::Bool(nr >= value_right.get_number(self)?.clone()))
                     },
                     _ => {
-                        Err(RunTimeError { message: format!("Cannot compare {value_left} with {value_right}. One of them is not a number"), return_error: false,loop_break: false })
+                        Err(RunTimeError { message: format!("Cannot compare {value_left} with {value_right}. One of them is not a number"), return_error: false,loop_break: false, from: self.location.from, to: self.location.to })
                     }
                 }
             }
@@ -618,10 +649,10 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                 let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
                 match value_left {
                     Value::Number(nr) => {
-                        Ok(Value::Bool(nr <= value_right.get_number()?.clone()))
+                        Ok(Value::Bool(nr <= value_right.get_number(self)?.clone()))
                     },
                     _ => {
-                        Err(RunTimeError { message: format!("Cannot compare {value_left} with {value_right}. One of them is not a number"), return_error: false,loop_break: false })
+                        Err(RunTimeError { message: format!("Cannot compare {value_left} with {value_right}. One of them is not a number"), return_error: false,loop_break: false, from: self.location.from, to: self.location.to })
                     }
                 }
             }
@@ -630,10 +661,10 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                 let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
                 match value_left {
                     Value::Number(nr) => {
-                        Ok(Value::Bool(nr < value_right.get_number()?.clone()))
+                        Ok(Value::Bool(nr < value_right.get_number(self)?.clone()))
                     },
                     _ => {
-                        Err(RunTimeError { message: format!("Cannot compare {value_left} with {value_right}. One of them is not a number"), return_error: false,loop_break: false })
+                        Err(RunTimeError { message: format!("Cannot compare {value_left} with {value_right}. One of them is not a number"), return_error: false,loop_break: false, from: self.location.from, to: self.location.to })
                     }
                 }
             }
@@ -642,10 +673,10 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                 let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
                 match value_left {
                     Value::Number(nr) => {
-                        Ok(Value::Bool(nr > value_right.get_number()?.clone()))
+                        Ok(Value::Bool(nr > value_right.get_number(self)?.clone()))
                     },
                     _ => {
-                        Err(RunTimeError { message: format!("Cannot compare {value_left} with {value_right}. One of them is not a number"), return_error: false,loop_break: false })
+                        Err(RunTimeError { message: format!("Cannot compare {value_left} with {value_right}. One of them is not a number"), return_error: false,loop_break: false, from: self.location.from, to: self.location.to })
                     }
                 }
             }
@@ -672,6 +703,8 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                 ),
                 return_error: false,
                 loop_break: false,
+                from: self.location.from,
+                to: self.location.to,
             }),
         };
     }
@@ -682,10 +715,20 @@ impl Visitor<Value, RunTimeError> for Interpreter {
         env: &Environment,
     ) -> Result<Value, RunTimeError> {
         let dist = self.locals.get(&expr.raw_token.get_variable());
-        if dist.is_some() {
+        let val = if dist.is_some() {
             env.get_at(&expr.name, dist.unwrap())
         } else {
-            Ok(env.get(&expr.name)?.clone())
+            env.get(&expr.name)
+        };
+        match val {
+            Ok(vl) => Ok(vl),
+            Err(e) => Err(RunTimeError {
+                message: e.message,
+                loop_break: false,
+                return_error: false,
+                from: self.location.from,
+                to: self.location.to,
+            }),
         }
     }
 
@@ -705,7 +748,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                 let value = expr
                     .expression
                     .accept::<Self, Value, RunTimeError>(self, env)?;
-                Ok(Value::Number(-value.get_number()?.clone()))
+                Ok(Value::Number(-value.get_number(self)?.clone()))
             }
             _ => Err(RunTimeError {
                 message: format!(
@@ -714,6 +757,8 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                 ),
                 return_error: false,
                 loop_break: false,
+                from: self.location.from,
+                to: self.location.to,
             }),
         };
     }

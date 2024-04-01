@@ -1,12 +1,19 @@
 use crate::environment::Environment;
 use crate::stmt::{
     BlockStatement, ClassDeclaration, ExpressionStatement, FunctionDeclaration, IfStatement,
-    PrintStatement, ReturnStatement, Stmt, VariableDeclarationStatement, WhileStatement,
+    PrintStatement, ReturnStatement, Statement, Stmt, VariableDeclarationStatement, WhileStatement,
 };
+use crate::types::Location;
 
 pub trait StatementVisitor<V, E> {
-    fn visit_statement(&mut self, expr: &mut Stmt, env: &mut Environment) -> Result<V, E> {
-        match expr {
+    fn set_current_location(&mut self, location: Location);
+    fn visit_statement(&mut self, expr: &mut Statement, env: &mut Environment) -> Result<V, E> {
+        let location = Location {
+            from: expr.from,
+            to: expr.to,
+        };
+        self.set_current_location(location);
+        match &mut expr.typ {
             Stmt::ExpressionStatement(expr) => self.visit_statement_expression(expr, env),
             Stmt::PrintStatement(expr) => self.visit_print_statement(expr, env),
             Stmt::VarDeclarationStatement(decl) => self.visit_declaration_statement(decl, env),

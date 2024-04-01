@@ -3,7 +3,14 @@ use crate::expression_visitor::Visitor;
 use crate::types::{Token, TokenType};
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Expression {
+pub struct Expression {
+    pub from: u128,
+    pub to: u128,
+    pub typ: Expr,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Expr {
     CallExpression(Box<CallExpression>),
     Binary(Box<BinaryExpression>),
     Unary(Box<UnaryExpression>),
@@ -15,14 +22,13 @@ pub enum Expression {
     Group(Box<GroupExpression>),
     Assignment(Box<AssignmentExpression>),
     Member(Box<MemberExpression>),
-    SetMember(Box<SetMemberExpression>),
     ThisExpression(Box<ThisExpression>),
 }
 
 impl Expression {
     pub fn get_identifier_name(&self) -> String {
-        match self {
-            Self::Identifier(ident) => ident.name.clone(),
+        match &self.typ {
+            Expr::Identifier(ident) => ident.name.clone(),
             _ => panic!("Shouldn't be reachable"),
         }
     }
@@ -31,13 +37,6 @@ impl Expression {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ThisExpression {
     pub keyword: Token,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct SetMemberExpression {
-    pub name: Token,
-    pub object: Expression,
-    pub value: Expression,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -130,8 +129,8 @@ impl Expression {
     }
 
     pub fn get_name(&self) -> String {
-        match self {
-            Self::Identifier(ref ident) => ident.name.clone(),
+        match &self.typ {
+            Expr::Identifier(ref ident) => ident.name.clone(),
             _ => panic!("Not an identifier"),
         }
     }

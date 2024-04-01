@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
-use crate::interpreter::{RunTimeError, Value};
+use crate::errors::EnvironmentError;
+use crate::interpreter::Value;
 use std::cell::RefCell;
-use std::ops::Deref;
 use std::rc::Rc;
 
 #[derive(Debug)]
@@ -54,10 +54,10 @@ impl Environment {
         Environment { node }
     }
 
-    pub fn get_at(&self, name: &String, dist: &u32) -> Result<Value, RunTimeError> {
+    pub fn get_at(&self, name: &String, dist: &u32) -> Result<Value, EnvironmentError> {
         let env = {
             let mut node_it = self.node.clone();
-            for i in 0..dist.clone() {
+            for _i in 0..dist.clone() {
                 node_it = {
                     let c = node_it.borrow().parent.clone().unwrap();
                     c
@@ -69,18 +69,14 @@ impl Environment {
             return Ok(env.borrow().map.get(name).unwrap().clone());
         }
 
-        Err(RunTimeError {
-            message: format!("Undefined variable {name}").to_string(),
-            return_error: false,
-            loop_break: false,
-        })
+        Err(EnvironmentError::new(name))
     }
 
     pub fn define(&mut self, var: String, value: Value) {
         self.node.borrow_mut().set(&var, value)
     }
 
-    pub fn assign(&mut self, name: String, value: Value) -> Result<(), RunTimeError> {
+    pub fn assign(&mut self, name: String, value: Value) -> Result<(), EnvironmentError> {
         let mut node_it = self.node.clone();
         loop {
             if node_it.borrow().map.contains_key(&name) {
@@ -95,11 +91,7 @@ impl Environment {
             }
         }
 
-        Err(RunTimeError {
-            message: format!("Undefined variable {name}").to_string(),
-            return_error: false,
-            loop_break: false,
-        })
+        Err(EnvironmentError::new(&name))
     }
 
     pub fn assign_at(
@@ -107,10 +99,10 @@ impl Environment {
         name: String,
         value: Value,
         dist: &u32,
-    ) -> Result<(), RunTimeError> {
+    ) -> Result<(), EnvironmentError> {
         let env = {
             let mut node_it = self.node.clone();
-            for i in 0..dist.clone() {
+            for _i in 0..dist.clone() {
                 node_it = {
                     let c = node_it.borrow().parent.clone().unwrap();
                     c
@@ -123,14 +115,10 @@ impl Environment {
             return Ok(());
         }
 
-        Err(RunTimeError {
-            message: format!("Undefined variable {name}").to_string(),
-            return_error: false,
-            loop_break: false,
-        })
+        Err(EnvironmentError::new(&name))
     }
 
-    pub fn get(&self, name: &String) -> Result<Value, RunTimeError> {
+    pub fn get(&self, name: &String) -> Result<Value, EnvironmentError> {
         let mut node_it = self.node.clone();
         loop {
             if node_it.borrow().map.contains_key(name) {
@@ -146,11 +134,7 @@ impl Environment {
             }
         }
 
-        Err(RunTimeError {
-            message: format!("Undefined variable {name}").to_string(),
-            return_error: false,
-            loop_break: false,
-        })
+        Err(EnvironmentError::new(&name))
     }
 
     pub fn extend(&self) -> Self {

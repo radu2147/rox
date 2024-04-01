@@ -4,6 +4,13 @@ use crate::statement_visitor::StatementVisitor;
 use crate::types::Token;
 
 #[derive(Debug, Clone)]
+pub struct Statement {
+    pub from: u128,
+    pub to: u128,
+    pub typ: Stmt,
+}
+
+#[derive(Debug, Clone)]
 pub enum Stmt {
     BreakStatement,
     ReturnStatement(ReturnStatement),
@@ -21,14 +28,14 @@ pub enum Stmt {
 pub struct ClassDeclaration {
     pub name: String,
     pub raw_token: Token,
-    pub methods: Vec<Stmt>,
-    pub fields: Vec<Stmt>,
+    pub methods: Vec<Statement>,
+    pub fields: Vec<Statement>,
 }
 
 #[derive(Debug, Clone)]
 pub struct FunctionDeclaration {
     pub params: Vec<Expression>,
-    pub body: Box<Stmt>,
+    pub body: Box<Statement>,
     pub name: String,
 }
 
@@ -56,22 +63,22 @@ pub struct ExpressionStatement {
 #[derive(Debug, Clone)]
 pub struct IfStatement {
     pub expression: Expression,
-    pub statement: Box<Stmt>,
-    pub else_statement: Option<Box<Stmt>>,
+    pub statement: Box<Statement>,
+    pub else_statement: Option<Box<Statement>>,
 }
 
 #[derive(Debug, Clone)]
 pub struct WhileStatement {
     pub expression: Expression,
-    pub statement: Box<Stmt>,
+    pub statement: Box<Statement>,
 }
 
 #[derive(Debug, Clone)]
 pub struct BlockStatement {
-    pub statements: Vec<Stmt>,
+    pub statements: Vec<Statement>,
 }
 
-impl Stmt {
+impl Statement {
     pub fn accept<T: StatementVisitor<V, E>, V, E>(
         &mut self,
         visitor: &mut T,

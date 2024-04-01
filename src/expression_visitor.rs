@@ -1,37 +1,37 @@
 use crate::ast_types::{
-    AssignmentExpression, BinaryExpression, CallExpression, Expression, GroupExpression,
-    Identifier, MemberExpression, SetMemberExpression, ThisExpression, UnaryExpression,
+    AssignmentExpression, BinaryExpression, CallExpression, Expr, Expression, GroupExpression,
+    Identifier, MemberExpression, ThisExpression, UnaryExpression,
 };
 use crate::environment::Environment;
+use crate::types::Location;
 
 pub trait Visitor<V, E> {
+    fn set_current_location(&mut self, location: Location);
     fn visit_expression(&mut self, expr: &mut Expression, env: &mut Environment) -> Result<V, E> {
-        match expr {
-            Expression::Binary(expr) => self.visit_binary_expression(expr, env),
-            Expression::Unary(expr) => self.visit_unary_expression(expr, env),
-            Expression::Group(expr) => self.visit_group_expression(expr, env),
-            Expression::NumberLiteral(expr) => Ok(self.visit_number_literal(expr)),
-            Expression::StringLiteral(expr) => Ok(self.visit_string_literal(expr)),
-            Expression::BoolLiteral(expr) => Ok(self.visit_bool_literal(expr)),
-            Expression::NilLiteral => Ok(self.visit_nil_literal()),
-            Expression::Identifier(expr) => self.visit_identifier_expression(expr, env),
-            Expression::Assignment(assign) => self.visit_assignement_expression(assign, env),
-            Expression::CallExpression(call) => self.visit_call_expression(call, env),
-            Expression::Member(member) => self.visit_member_expression(member, env),
-            Expression::SetMember(member) => self.visit_set_member_expression(member, env),
-            Expression::ThisExpression(this_expr) => self.visit_this_expression(this_expr, env),
+        let location = Location {
+            from: expr.from,
+            to: expr.to,
+        };
+        self.set_current_location(location);
+        match &mut expr.typ {
+            Expr::Binary(expr) => self.visit_binary_expression(expr, env),
+            Expr::Unary(expr) => self.visit_unary_expression(expr, env),
+            Expr::Group(expr) => self.visit_group_expression(expr, env),
+            Expr::NumberLiteral(expr) => Ok(self.visit_number_literal(expr)),
+            Expr::StringLiteral(expr) => Ok(self.visit_string_literal(expr)),
+            Expr::BoolLiteral(expr) => Ok(self.visit_bool_literal(expr)),
+            Expr::NilLiteral => Ok(self.visit_nil_literal()),
+            Expr::Identifier(expr) => self.visit_identifier_expression(expr, env),
+            Expr::Assignment(assign) => self.visit_assignement_expression(assign, env),
+            Expr::CallExpression(call) => self.visit_call_expression(call, env),
+            Expr::Member(member) => self.visit_member_expression(member, env),
+            Expr::ThisExpression(this_expr) => self.visit_this_expression(this_expr, env),
         }
     }
 
     fn visit_this_expression(
         &mut self,
         expr: &mut ThisExpression,
-        env: &mut Environment,
-    ) -> Result<V, E>;
-
-    fn visit_set_member_expression(
-        &mut self,
-        expr: &mut SetMemberExpression,
         env: &mut Environment,
     ) -> Result<V, E>;
 
