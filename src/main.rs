@@ -23,10 +23,18 @@ use std::io::Write;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn run(code: String, env: &mut Environment) {
-    let mut error_handler = ErrorHandler { content: vec![] };
-    error_handler.set_content(&code);
-    let mut scanner = Scanner::new(code.clone(), &error_handler);
-    let mut parser = Parser::new(scanner.scan_tokens(), &error_handler);
+    let copy_code = code.clone();
+    let mut scanner = Scanner::new(code.clone());
+    let mut parser;
+    match scanner.scan_tokens() {
+        Ok(tokens) => {
+            parser = Parser::new(tokens);
+        }
+        Err(e) => {
+            log_error!("ParseError", copy_code, e.message, e.line);
+            return;
+        }
+    };
     let mut interpreter = Interpreter {
         ret_val: Value::Nil,
         locals: HashMap::new(),
@@ -38,78 +46,16 @@ fn run(code: String, env: &mut Environment) {
             Ok(()) => match interpreter.interpret(&mut t, env) {
                 Ok(_) => {}
                 Err(e) => {
-                    error_handler.log_error(e.from, e.to, &e.message);
+                    log_error!("RunTimeError", copy_code, e.message, e.from, e.to);
                 }
             },
             Err(e) => {
-                error_handler.log_error(e.from, e.to, &e.message);
+                log_error!("ResolverError", copy_code, e.message, e.from, e.to);
             }
         },
-        Err(e) => error_handler.error(e.line, &e.message),
-    }
-}
-
-struct ErrorHandler<'a> {
-    content: Vec<&'a str>,
-}
-
-impl<'a> ErrorHandler<'a> {
-    fn error(&self, line: u128, message: &str) {
-        self.report(line, "", message);
-    }
-
-    fn log_error(&self, from: u128, to: u128, message: &str) {
-        let mut error_zone = String::new();
-        let start = {
-            if from > 1 {
-                from - 2
-            } else {
-                from
-            }
-        };
-
-        let end = {
-            if to < self.content.len() as u128 - 1 {
-                to + 1
-            } else {
-                self.content.len() as u128
-            }
-        };
-
-        for lin in (start - 1)..end {
-            if self.content.len() as u128 > lin {
-                error_zone += &format!("{}| {}\n", lin + 1, self.content[lin as usize]);
-            }
+        Err(er) => {
+            log_error!("ParseError", copy_code, er.message, er.line);
         }
-        println!("{error_zone}");
-        if from == to {
-            println!("[line {from}] Error: {message}");
-        } else {
-            println!("[line {from}-{to}] Error: {message}");
-        }
-    }
-
-    fn report(&self, line: u128, location: &str, message: &str) {
-        let mut error_zone = String::new();
-        let start = {
-            if line > 1 {
-                line - 2
-            } else {
-                line
-            }
-        };
-        for lin in start..(line + 1) {
-            if self.content.len() as u128 > lin {
-                error_zone += &self.content[lin as usize];
-                error_zone += "\n";
-            }
-        }
-        println!("{error_zone}");
-        println!("[line {line}] Error {location}: {message}");
-    }
-
-    fn set_content(&mut self, content: &'a String) {
-        self.content = content.split("\n").collect::<Vec<&str>>();
     }
 }
 

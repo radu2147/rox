@@ -1,30 +1,29 @@
+use crate::errors::ParseError;
 use crate::types::{Token, TokenType};
-use crate::ErrorHandler;
 use uuid::Uuid;
 
-pub struct Scanner<'a> {
+pub struct Scanner {
     pub source: String,
-    pub error_handler: &'a ErrorHandler<'a>,
     tokens: Vec<Token>,
     start: i32,
     current: i32,
     line: u128,
 }
 
-impl<'a> Scanner<'a> {
-    pub fn scan_tokens(mut self) -> Vec<Token> {
+impl Scanner {
+    pub fn scan_tokens(mut self) -> Result<Vec<Token>, ParseError> {
         while !self.is_at_end() {
             self.start = self.current;
-            self.scan_token();
+            self.scan_token()?;
         }
         self.tokens.push(Token {
             typ: TokenType::Eof,
             line: self.line.clone(),
         });
-        self.tokens
+        Ok(self.tokens)
     }
 
-    fn scan_token(&mut self) {
+    fn scan_token(&mut self) -> Result<(), ParseError> {
         let c = self.advance();
         match c {
             '(' => self.tokens.push(Token {
@@ -204,8 +203,10 @@ impl<'a> Scanner<'a> {
                     self.advance();
                 }
                 if self.is_at_end() {
-                    self.error_handler.error(self.line, "Unterminated string");
-                    return;
+                    return Err(ParseError {
+                        message: "Unterminated string.".to_string(),
+                        line: self.line,
+                    });
                 }
                 self.advance();
                 self.tokens.push(Token {
@@ -213,8 +214,14 @@ impl<'a> Scanner<'a> {
                     line: self.line,
                 });
             }
-            _ => self.error_handler.error(self.line, "Unexpected character."),
+            _ => {
+                return Err(ParseError {
+                    message: "Unexpected character.".to_string(),
+                    line: self.line,
+                })
+            }
         };
+        Ok(())
     }
 
     fn get_keyword_token(&self, identifier_string: &str, line: u128) -> Option<Token> {
@@ -337,10 +344,9 @@ impl<'a> Scanner<'a> {
         self.current >= self.source.len() as i32
     }
 
-    pub fn new(source: String, error_handler: &'a ErrorHandler<'a>) -> Self {
+    pub fn new(source: String) -> Self {
         Self {
             source,
-            error_handler,
             tokens: vec![],
             start: 0,
             current: 0,

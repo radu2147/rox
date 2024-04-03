@@ -1,7 +1,7 @@
 var a = 4;
 var b = 1;
 if(a < b){
-    print a;
+    return a;
 } else{
-    print xb;
+    print b;
 }

@@ -3,6 +3,7 @@ use crate::ast_types::{
     Identifier, MemberExpression, Operator, ThisExpression, UnaryExpression,
 };
 use crate::environment::Environment;
+use crate::errors::RunTimeError;
 use crate::expression_visitor::Visitor;
 use crate::statement_visitor::StatementVisitor;
 use crate::stmt::{
@@ -13,15 +14,6 @@ use crate::types::{Location, Token, Variable};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::ops::Add;
-
-#[derive(Debug)]
-pub struct RunTimeError {
-    pub message: String,
-    pub return_error: bool,
-    pub loop_break: bool,
-    pub from: u128,
-    pub to: u128,
-}
 
 #[derive(Debug, Clone)]
 pub enum Value {

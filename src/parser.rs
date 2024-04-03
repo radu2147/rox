@@ -2,32 +2,21 @@ use crate::ast_types::{
     AssignmentExpression, BinaryExpression, CallExpression, Expr, Expression, GroupExpression,
     Identifier, MemberExpression, Operator, ThisExpression, UnaryExpression,
 };
+use crate::errors::ParseError;
 use crate::stmt::{
     BlockStatement, ClassDeclaration, ExpressionStatement, FunctionDeclaration, IfStatement,
     PrintStatement, ReturnStatement, Statement, Stmt, VariableDeclarationStatement, WhileStatement,
 };
 use crate::types::{Token, TokenType};
-use crate::ErrorHandler;
 
-pub struct Parser<'a> {
+pub struct Parser {
     pub tokens: Vec<Token>,
-    pub error_handler: &'a ErrorHandler<'a>,
     current: i32,
 }
 
-#[derive(Debug)]
-pub struct ParseError {
-    pub message: String,
-    pub line: u128,
-}
-
-impl<'a> Parser<'a> {
-    pub fn new(tokens: Vec<Token>, error_handler: &'a ErrorHandler) -> Self {
-        Self {
-            tokens,
-            current: 0,
-            error_handler,
-        }
+impl Parser {
+    pub fn new(tokens: Vec<Token>) -> Self {
+        Self { tokens, current: 0 }
     }
 
     pub fn consume_token(

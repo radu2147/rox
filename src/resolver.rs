@@ -3,6 +3,7 @@ use crate::ast_types::{
     MemberExpression, ThisExpression, UnaryExpression,
 };
 use crate::environment::Environment;
+use crate::errors::ResolverError;
 use crate::expression_visitor::Visitor;
 use crate::interpreter::Interpreter;
 use crate::statement_visitor::StatementVisitor;
@@ -28,13 +29,6 @@ pub enum FunctionType {
     None,
     Function,
     Method,
-}
-
-#[derive(Debug)]
-pub struct ResolverError {
-    pub message: String,
-    pub from: u128,
-    pub to: u128,
 }
 
 #[derive(Clone, PartialEq)]
