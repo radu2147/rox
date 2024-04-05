@@ -1,3 +1,5 @@
+#[macro_use]
+extern crate macro_errors;
 mod ast_types;
 mod environment;
 mod errors;
@@ -11,6 +13,7 @@ mod stmt;
 mod types;
 
 use crate::environment::Environment;
+use crate::errors::InterpreterError;
 use crate::interpreter::{Callable, Interpreter, Value};
 use crate::parser::Parser;
 use crate::resolver::Resolver;
@@ -31,7 +34,7 @@ fn run(code: String, env: &mut Environment) {
             parser = Parser::new(tokens);
         }
         Err(e) => {
-            log_error!("ParseError", copy_code, e.message, e.line);
+            log_error!(copy_code, e, e.line);
             return;
         }
     };
@@ -46,15 +49,15 @@ fn run(code: String, env: &mut Environment) {
             Ok(()) => match interpreter.interpret(&mut t, env) {
                 Ok(_) => {}
                 Err(e) => {
-                    log_error!("RunTimeError", copy_code, e.message, e.from, e.to);
+                    log_error!(copy_code, e, e.from, e.to);
                 }
             },
             Err(e) => {
-                log_error!("ResolverError", copy_code, e.message, e.from, e.to);
+                log_error!(copy_code, e, e.from, e.to);
             }
         },
         Err(er) => {
-            log_error!("ParseError", copy_code, er.message, er.line);
+            log_error!(copy_code, er, er.line);
         }
     }
 }

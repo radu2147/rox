@@ -1,10 +1,13 @@
 [package]
-name = "simba"
+name = "macro-errors"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[lib]
+proc-macro = true
+
 [dependencies]
-uuid = { version = "1.8.0", features = ["v4"] }
-macro-errors = { path = "src/macro-errors" }
+syn = "^2.0"
+quote = "^1.0"

@@ -1,14 +1,19 @@
+pub trait InterpreterError {
+    fn error(&self) -> String;
+}
+
+#[derive(Debug, InterpreterError)]
 pub struct EnvironmentError {
     pub message: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, InterpreterError)]
 pub struct ParseError {
     pub message: String,
     pub line: u128,
 }
 
-#[derive(Debug)]
+#[derive(Debug, InterpreterError)]
 pub struct RunTimeError {
     pub message: String,
     pub return_error: bool,
@@ -17,7 +22,7 @@ pub struct RunTimeError {
     pub to: u128,
 }
 
-#[derive(Debug)]
+#[derive(Debug, InterpreterError)]
 pub struct ResolverError {
     pub message: String,
     pub from: u128,
@@ -34,11 +39,11 @@ impl EnvironmentError {
 
 #[macro_export]
 macro_rules! log_error {
-    ($err: expr, $content: expr, $message: expr, $($line:expr),*) => {
+    ($content: expr, $e: expr, $($line:expr),*) => {
         let mut error_zone = String::new();
         let code_lines = $content.split("\n").collect::<Vec<&str>>();
-        let typ = $err;
-        let message = $message;
+        let message = &$e.message;
+        let typ = $e.error();
         let mut lines = vec![];
         $(
             let line: u128 = $line;
@@ -79,9 +84,9 @@ macro_rules! log_error {
 
         println!("{error_zone}");
         if from == to {
-            println!("[line {from}] Error {typ}: {message}");
+            println!("[line {from}] {typ}: {message}");
         } else {
-            println!("[line {from}-{to}] Error {typ}: {message}");
+            println!("[line {from}-{to}] {typ}: {message}");
         }
     };
 }
