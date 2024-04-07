@@ -8,15 +8,18 @@ use crate::stmt::{
     PrintStatement, ReturnStatement, Statement, Stmt, VariableDeclarationStatement, WhileStatement,
 };
 use crate::types::{Token, TokenType};
+use std::iter::Peekable;
+use std::vec::IntoIter;
 
 pub struct Parser {
-    pub tokens: Vec<Token>,
-    current: i32,
+    tokens_iter: Peekable<IntoIter<Token>>,
 }
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
-        Self { tokens, current: 0 }
+        Self {
+            tokens_iter: tokens.into_iter().peekable(),
+        }
     }
 
     pub fn consume_token(
@@ -25,7 +28,7 @@ impl Parser {
         error_message: &str,
     ) -> Result<u128, ParseError> {
         if self.peek().typ == token_type {
-            return Ok(self.advance().clone().unwrap().clone().line);
+            return Ok(self.advance().unwrap().line);
         }
         Err(ParseError {
             message: error_message.to_string(),
@@ -35,7 +38,7 @@ impl Parser {
 
     pub fn parse_program(&mut self) -> Result<Vec<Statement>, ParseError> {
         let mut stmts = vec![];
-        while !self.is_at_end() {
+        while !self.at_end() {
             let stmt = self.parse_declaration()?;
             stmts.push(stmt);
         }
@@ -46,10 +49,10 @@ impl Parser {
     pub fn parse_declaration(&mut self) -> Result<Statement, ParseError> {
         return match self.peek().typ {
             TokenType::Class => {
-                let start_line = self.advance().clone().unwrap().line;
+                let start_line = self.advance().unwrap().line;
                 if let TokenType::Identifier(name, _) = &self.peek().typ {
                     let class_name = name.to_string();
-                    let raw_name_token = self.advance().unwrap().clone();
+                    let raw_name_token = self.advance().unwrap();
                     self.consume_token(
                         TokenType::LeftParen,
                         "Expected left paren after class declaration",
@@ -60,7 +63,7 @@ impl Parser {
                         if let TokenType::RightParen = self.peek().typ {
                             break;
                         }
-                        if self.is_at_end() {
+                        if self.at_end() {
                             break;
                         }
                         let stmt = self.parse_declaration()?;
@@ -92,8 +95,8 @@ impl Parser {
                 }
             }
             TokenType::Fun => {
-                let start_line = self.advance().clone().unwrap().line;
-                if let TokenType::Identifier(name, _) = self.peek().typ.clone() {
+                let start_line = self.advance().unwrap().line;
+                if let TokenType::Identifier(name, _) = &self.peek().typ {
                     let name = name.clone();
                     self.advance();
                     self.consume_token(
@@ -122,16 +125,16 @@ impl Parser {
                 });
             }
             TokenType::Var => {
-                let line = self.advance().clone().unwrap().line;
+                let line = self.advance().unwrap().line;
                 if let TokenType::Identifier(name, _) = &self.peek().typ {
                     let name = name.clone();
-                    let line = self.advance().clone().unwrap().line;
+                    let line = self.advance().unwrap().line;
                     let mut initializer = Expression {
                         from: line,
                         to: line,
                         typ: Expr::NilLiteral,
                     };
-                    if let TokenType::Equal = self.peek().typ.clone() {
+                    if let TokenType::Equal = self.peek().typ {
                         self.advance();
                         initializer = self.parse_expression()?;
                     }
@@ -162,8 +165,8 @@ impl Parser {
         let mut rez = Vec::new();
         while let TokenType::Identifier(_, _) = &self.peek().typ {
             rez.push(self.parse_primary()?);
-            if let TokenType::Comma = self.peek().typ.clone() {
-                let line = self.advance().clone().unwrap().line;
+            if let TokenType::Comma = self.peek().typ {
+                let line = self.advance().unwrap().line;
                 if rez.len() > 255 {
                     return Err(ParseError {
                         message: "Cannot have more than 255 arguments for a function call"
@@ -180,8 +183,8 @@ impl Parser {
     }
 
     pub fn parse_stmt(&mut self) -> Result<Statement, ParseError> {
-        let start_line = self.peek().line.clone();
-        return match self.peek().typ.clone() {
+        let start_line = self.peek().line;
+        return match self.peek().typ {
             TokenType::Print => {
                 self.advance();
                 let expression = self.parse_expression()?;
@@ -205,8 +208,8 @@ impl Parser {
             }
             TokenType::Return => {
                 self.advance();
-                if let TokenType::Semicolon = self.peek().typ.clone() {
-                    let end_line = self.advance().clone().unwrap().line;
+                if let TokenType::Semicolon = self.peek().typ {
+                    let end_line = self.advance().unwrap().line;
                     Ok(Statement {
                         from: start_line,
                         to: end_line,
@@ -234,9 +237,9 @@ impl Parser {
                 let mut stmts = vec![];
                 let end_line;
                 loop {
-                    match self.peek().typ.clone() {
+                    match self.peek().typ {
                         TokenType::RightParen => {
-                            if self.is_at_end() {
+                            if self.at_end() {
                                 return Err(ParseError {
                                     message: "Expected matching } at the end of statements"
                                         .to_string(),
@@ -364,7 +367,7 @@ impl Parser {
                     "If expression should contain ending brace",
                 )?;
                 let stmt = self.parse_stmt()?;
-                if let TokenType::Else = self.peek().clone().typ {
+                if let TokenType::Else = self.peek().typ {
                     self.advance();
                     let else_stmt = self.parse_stmt()?;
                     let end_line = else_stmt.to.clone();
@@ -409,8 +412,8 @@ impl Parser {
 
     pub fn parse_assignment(&mut self) -> Result<Expression, ParseError> {
         let receiver = self.parse_or_expression()?;
-        if let TokenType::Equal = self.peek().clone().typ {
-            let line = self.advance().clone().unwrap().line;
+        if let TokenType::Equal = self.peek().typ {
+            let line = self.advance().unwrap().line;
             let asignee = self.parse_assignment()?;
             if let Expr::Identifier(ident) = receiver.typ {
                 return Ok(Expression {
@@ -434,8 +437,8 @@ impl Parser {
 
     pub fn parse_or_expression(&mut self) -> Result<Expression, ParseError> {
         let mut rez = self.parse_and_expression()?;
-        while let TokenType::Or = self.peek().clone().typ {
-            let op = self.advance().unwrap().clone();
+        while let TokenType::Or = self.peek().typ {
+            let op = self.advance().unwrap();
             rez = {
                 let right_hand = self.parse_and_expression()?;
                 Expression {
@@ -455,7 +458,7 @@ impl Parser {
     pub fn parse_and_expression(&mut self) -> Result<Expression, ParseError> {
         let mut rez = self.parse_equality()?;
         while let TokenType::And = self.peek().typ {
-            let op = self.advance().unwrap().clone();
+            let op = self.advance().unwrap();
             rez = {
                 let right_hand = self.parse_equality()?;
                 Expression {
@@ -477,7 +480,7 @@ impl Parser {
         loop {
             match &self.peek().typ {
                 TokenType::EqualEqual | TokenType::BangEqual => {
-                    let op = self.advance().unwrap().clone();
+                    let op = self.advance().unwrap();
                     rez = {
                         let rhs = self.parse_comparison()?;
                         Expression {
@@ -504,7 +507,7 @@ impl Parser {
         | TokenType::Less
         | TokenType::LessEqual = self.peek().typ
         {
-            let op = self.advance().unwrap().clone();
+            let op = self.advance().unwrap();
             rez = {
                 let right_hand = self.parse_term()?;
                 Expression {
@@ -522,9 +525,9 @@ impl Parser {
     }
 
     pub fn parse_term(&mut self) -> Result<Expression, ParseError> {
-        let mut rez = self.parse_factor()?.clone();
+        let mut rez = self.parse_factor()?;
         while let TokenType::Plus | TokenType::Minus = self.peek().typ {
-            let op = self.advance().unwrap().clone();
+            let op = self.advance().unwrap();
             rez = {
                 let right_hand = self.parse_factor()?;
                 Expression {
@@ -544,7 +547,7 @@ impl Parser {
     pub fn parse_factor(&mut self) -> Result<Expression, ParseError> {
         let mut rez = self.parse_unary()?;
         while let TokenType::Star | TokenType::Slash = self.peek().typ {
-            let op = self.advance().unwrap().clone();
+            let op = self.advance().unwrap();
             rez = {
                 let right_hand = self.parse_unary()?;
                 Expression {
@@ -563,11 +566,11 @@ impl Parser {
 
     pub fn parse_unary(&mut self) -> Result<Expression, ParseError> {
         if let TokenType::Bang | TokenType::Minus = self.peek().typ {
-            let op = self.advance().unwrap().clone();
+            let op = self.advance().unwrap();
             let right_hand = self.parse_unary()?;
             return Ok(Expression {
-                from: op.line.clone(),
-                to: right_hand.to.clone(),
+                from: op.line,
+                to: right_hand.to,
                 typ: Expr::Unary(Box::new(UnaryExpression {
                     operator: Operator::from(&op),
                     expression: right_hand,
@@ -609,10 +612,10 @@ impl Parser {
             } else if let TokenType::Dot = self.peek().typ {
                 let line = self.advance().unwrap().line;
                 if let TokenType::Identifier(_, _) = self.peek().typ {
-                    let token = self.advance().unwrap().clone();
+                    let token = self.advance().unwrap();
                     rez = Expression {
-                        from: rez.from.clone(),
-                        to: token.line.clone(),
+                        from: rez.from,
+                        to: token.line,
                         typ: Expr::Member(Box::new(MemberExpression {
                             name: token,
                             object: rez,
@@ -654,7 +657,7 @@ impl Parser {
     pub fn parse_primary(&mut self) -> Result<Expression, ParseError> {
         match &self.peek().typ {
             TokenType::True => {
-                let line = self.advance().clone().unwrap().line.clone();
+                let line = self.advance().unwrap().line;
                 Ok(Expression {
                     from: line,
                     to: line,
@@ -662,7 +665,7 @@ impl Parser {
                 })
             }
             TokenType::False => {
-                let line = self.advance().clone().unwrap().line.clone();
+                let line = self.advance().unwrap().line;
                 Ok(Expression {
                     from: line,
                     to: line,
@@ -671,7 +674,7 @@ impl Parser {
             }
             TokenType::Number(val) => {
                 let value = val.clone();
-                let line = self.advance().clone().unwrap().line.clone();
+                let line = self.advance().unwrap().line;
                 Ok(Expression {
                     from: line,
                     to: line,
@@ -680,7 +683,7 @@ impl Parser {
             }
             TokenType::String(val) => {
                 let value = val.clone();
-                let line = self.advance().clone().unwrap().line.clone();
+                let line = self.advance().unwrap().line;
                 Ok(Expression {
                     from: line,
                     to: line,
@@ -688,24 +691,24 @@ impl Parser {
                 })
             }
             TokenType::This(_) => {
-                let keyword = self.advance().unwrap().clone();
+                let keyword = self.advance().unwrap();
                 Ok(Expression {
-                    from: keyword.line.clone(),
-                    to: keyword.line.clone(),
+                    from: keyword.line,
+                    to: keyword.line,
                     typ: Expr::ThisExpression(Box::new(ThisExpression { keyword })),
                 })
             }
             TokenType::Identifier(name, _) => {
                 let name = name.clone();
-                let raw_token = self.advance().unwrap().clone();
+                let raw_token = self.advance().unwrap();
                 Ok(Expression {
-                    from: raw_token.line.clone(),
-                    to: raw_token.line.clone(),
+                    from: raw_token.line,
+                    to: raw_token.line,
                     typ: Expr::Identifier(Identifier { name, raw_token }),
                 })
             }
             TokenType::Nil => {
-                let line = self.advance().clone().unwrap().line.clone();
+                let line = self.advance().unwrap().line;
                 Ok(Expression {
                     from: line,
                     to: line,
@@ -713,7 +716,7 @@ impl Parser {
                 })
             }
             TokenType::LeftBrace => {
-                let start_line = self.advance().clone().unwrap().line.clone();
+                let start_line = self.advance().unwrap().line;
                 let group_expr = self.parse_expression()?;
                 let end_line = self.consume_token(
                     TokenType::RightBrace,
@@ -734,22 +737,18 @@ impl Parser {
         }
     }
 
-    fn is_at_end(&self) -> bool {
-        if let TokenType::Eof = self.tokens.get(self.current as usize).unwrap().typ {
-            return true;
-        }
-        return false;
+    fn at_end(&mut self) -> bool {
+        self.peek().typ == TokenType::Eof
     }
 
-    fn peek(&self) -> &Token {
-        return self.tokens.get(self.current as usize).unwrap();
+    fn peek(&mut self) -> &Token {
+        self.tokens_iter.peek().unwrap()
     }
 
-    fn advance(&mut self) -> Option<&Token> {
-        if self.is_at_end() {
+    fn advance(&mut self) -> Option<Token> {
+        if self.at_end() {
             return None;
         }
-        self.current += 1;
-        return Some(self.tokens.get((self.current - 1) as usize).unwrap());
+        self.tokens_iter.next()
     }
 }
