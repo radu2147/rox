@@ -52,25 +52,25 @@ macro_rules! log_error {
         if lines.len() > 2 || lines.len() == 0 {
             panic!("Lines should only have 2 arguments")
         }
-        let from = lines.get(0).unwrap().clone();
+        let from = lines.get(0).unwrap();
         let to = {
             if lines.len() == 2 {
-                lines.get(1).unwrap().clone()
+                lines.get(1).unwrap()
             } else {
                 from
             }
         };
         let start = {
-            if from > 1 {
-                from - 2
+            if *from > 1 {
+                *from - 2
             } else {
-                from
+                *from
             }
         };
 
         let end = {
-            if to < code_lines.len() as u128 - 1 {
-                to + 1
+            if *to < code_lines.len() as u128 - 1 {
+                *to + 1
             } else {
                 code_lines.len() as u128
             }
