@@ -18,9 +18,27 @@ impl Scanner {
         }
         self.tokens.push(Token {
             typ: TokenType::Eof,
-            line: self.line.clone(),
+            line: self.line,
         });
         Ok(self.tokens)
+    }
+
+    pub fn match_equal(
+        &mut self,
+        condition_met_token_type: TokenType,
+        alternative_token_type: TokenType,
+    ) {
+        if self.match_char('=') {
+            self.tokens.push(Token {
+                typ: condition_met_token_type,
+                line: self.line,
+            })
+        } else {
+            self.tokens.push(Token {
+                typ: alternative_token_type,
+                line: self.line,
+            })
+        }
     }
 
     fn scan_token(&mut self) -> Result<(), ParseError> {
@@ -67,56 +85,16 @@ impl Scanner {
                 line: self.line,
             }),
             '!' => {
-                if self.match_char('=') {
-                    self.tokens.push(Token {
-                        typ: TokenType::BangEqual,
-                        line: self.line,
-                    })
-                } else {
-                    self.tokens.push(Token {
-                        typ: TokenType::Bang,
-                        line: self.line,
-                    })
-                }
+                self.match_equal(TokenType::BangEqual, TokenType::Bang);
             }
             '=' => {
-                if self.match_char('=') {
-                    self.tokens.push(Token {
-                        typ: TokenType::EqualEqual,
-                        line: self.line,
-                    })
-                } else {
-                    self.tokens.push(Token {
-                        typ: TokenType::Equal,
-                        line: self.line,
-                    })
-                }
+                self.match_equal(TokenType::EqualEqual, TokenType::Equal);
             }
             '>' => {
-                if self.match_char('=') {
-                    self.tokens.push(Token {
-                        typ: TokenType::GraterEqual,
-                        line: self.line,
-                    })
-                } else {
-                    self.tokens.push(Token {
-                        typ: TokenType::Grater,
-                        line: self.line,
-                    })
-                }
+                self.match_equal(TokenType::GraterEqual, TokenType::Grater);
             }
             '<' => {
-                if self.match_char('=') {
-                    self.tokens.push(Token {
-                        typ: TokenType::LessEqual,
-                        line: self.line,
-                    })
-                } else {
-                    self.tokens.push(Token {
-                        typ: TokenType::Less,
-                        line: self.line,
-                    })
-                }
+                self.match_equal(TokenType::LessEqual, TokenType::Less);
             }
             '/' => {
                 if self.match_char('/') {
@@ -136,7 +114,7 @@ impl Scanner {
             ' ' | '\t' | '\r' => {}
             '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' => {
                 let mut number_literal = String::new();
-                number_literal.push(c.clone());
+                number_literal.push(c);
                 while let Some(chr) = self.peek() {
                     if !Self::is_digit(&chr) {
                         break;
@@ -171,10 +149,10 @@ impl Scanner {
             | 'o' | 'O' | 'p' | 'P' | 'q' | 'Q' | 'r' | 'R' | 's' | 'S' | 't' | 'T' | 'u' | 'U'
             | 'v' | 'V' | 'w' | 'W' | 'x' | 'X' | 'y' | 'Y' | 'z' | 'Z' | '_' => {
                 let mut identifier_string = String::new();
-                identifier_string.push(c.clone());
+                identifier_string.push(c);
                 while let Some(chr) = self.peek() {
                     if Self::is_alpha(&chr) || Self::is_digit(&chr) {
-                        identifier_string.push(chr.clone());
+                        identifier_string.push(chr);
                         self.advance();
                     } else {
                         break;
@@ -199,7 +177,7 @@ impl Scanner {
                     if chr == '\n' {
                         self.line += 1;
                     }
-                    string_literal.push(chr.clone());
+                    string_literal.push(chr);
                     self.advance();
                 }
                 if self.is_at_end() {
