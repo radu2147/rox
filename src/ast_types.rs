@@ -1,6 +1,6 @@
 use crate::environment::Environment;
 use crate::expression_visitor::Visitor;
-use crate::types::{Token, TokenType};
+use crate::types::Token;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Expression {
@@ -96,27 +96,6 @@ pub enum Operator {
     NotEqual,
     And,
     Or,
-}
-
-impl Operator {
-    pub fn from(token: &Token) -> Self {
-        match token.typ {
-            TokenType::Plus => Operator::Plus,
-            TokenType::Minus => Operator::Minus,
-            TokenType::Star => Operator::Mul,
-            TokenType::Slash => Operator::Div,
-            TokenType::GraterEqual => Operator::GE,
-            TokenType::LessEqual => Operator::LE,
-            TokenType::Less => Operator::Less,
-            TokenType::Grater => Operator::Greater,
-            TokenType::EqualEqual => Operator::EQ,
-            TokenType::BangEqual => Operator::NotEqual,
-            TokenType::Bang => Operator::Not,
-            TokenType::And => Operator::And,
-            TokenType::Or => Operator::Or,
-            _ => panic!("Unknown operator {:?}", token),
-        }
-    }
 }
 
 impl Expression {

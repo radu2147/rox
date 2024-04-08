@@ -446,7 +446,7 @@ impl Parser {
                     to: right_hand.to.clone(),
                     typ: Expr::Binary(Box::new(BinaryExpression {
                         left: rez,
-                        operator: Operator::from(&op),
+                        operator: op.into(),
                         right: right_hand,
                     })),
                 }
@@ -466,7 +466,7 @@ impl Parser {
                     to: right_hand.to.clone(),
                     typ: Expr::Binary(Box::new(BinaryExpression {
                         left: rez,
-                        operator: Operator::from(&op),
+                        operator: op.into(),
                         right: right_hand,
                     })),
                 }
@@ -488,7 +488,7 @@ impl Parser {
                             to: rhs.to.clone(),
                             typ: Expr::Binary(Box::new(BinaryExpression {
                                 left: rez,
-                                operator: Operator::from(&op),
+                                operator: op.into(),
                                 right: rhs,
                             })),
                         }
@@ -515,7 +515,7 @@ impl Parser {
                     to: rez.to.clone(),
                     typ: Expr::Binary(Box::new(BinaryExpression {
                         left: rez,
-                        operator: Operator::from(&op),
+                        operator: op.into(),
                         right: right_hand,
                     })),
                 }
@@ -535,7 +535,7 @@ impl Parser {
                     to: rez.to.clone(),
                     typ: Expr::Binary(Box::new(BinaryExpression {
                         left: rez,
-                        operator: Operator::from(&op),
+                        operator: op.into(),
                         right: right_hand,
                     })),
                 }
@@ -555,7 +555,7 @@ impl Parser {
                     to: rez.to.clone(),
                     typ: Expr::Binary(Box::new(BinaryExpression {
                         left: rez,
-                        operator: Operator::from(&op),
+                        operator: op.into(),
                         right: right_hand,
                     })),
                 }
@@ -572,7 +572,7 @@ impl Parser {
                 from: op.line,
                 to: right_hand.to,
                 typ: Expr::Unary(Box::new(UnaryExpression {
-                    operator: Operator::from(&op),
+                    operator: op.into(),
                     expression: right_hand,
                 })),
             });
