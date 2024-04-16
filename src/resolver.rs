@@ -16,7 +16,7 @@ use std::collections::HashMap;
 
 pub struct Resolver<'a> {
     pub interpreter: &'a mut Interpreter,
-    scopes: Vec<HashMap<String, bool>>,
+    scopes: Vec<HashMap<&'a String, bool>>,
     ln: usize,
     current_function: FunctionType,
     current_type: ClassType,
@@ -73,8 +73,8 @@ impl<'a> Resolver<'a> {
 
         self.begin_scope();
         for param in &mut func_dec.params {
-            self.declare(&param.get_name());
-            self.define(&param.get_name());
+            self.declare(param.get_name());
+            self.define(param.get_name());
             param.accept(self, env)?;
         }
         func_dec.body.accept(self, env)?;
@@ -100,7 +100,7 @@ impl<'a> Resolver<'a> {
             return;
         }
         let mut scope = self.scopes.get_mut(self.ln - 1).unwrap();
-        scope.insert(lexeme.clone(), false);
+        scope.insert(lexeme, false);
     }
 
     fn define(&mut self, lexeme: &String) {
@@ -108,7 +108,7 @@ impl<'a> Resolver<'a> {
             return;
         }
         let mut scope = self.scopes.get_mut(self.ln - 1).unwrap();
-        scope.entry(lexeme.clone()).and_modify(|v| *v = true);
+        scope.entry(lexeme).and_modify(|v| *v = true);
     }
 
     fn resolve_local(&mut self, expr: &Token) {
@@ -280,12 +280,9 @@ impl StatementVisitor<(), ResolverError> for Resolver<'_> {
     ) -> Result<(), ResolverError> {
         if_statement.expression.accept(self, env)?;
         if_statement.statement.accept(self, env)?;
-        if if_statement.else_statement.is_some() {
-            if_statement
-                .else_statement
-                .clone()
-                .unwrap()
-                .accept(self, env)?;
+        match &mut if_statement.else_statement {
+            None => {}
+            Some(else_stmt) => else_stmt.accept(self, env)?,
         }
 
         Ok(())
@@ -314,12 +311,11 @@ impl StatementVisitor<(), ResolverError> for Resolver<'_> {
                 to: self.location.to,
             });
         }
-        if return_stmt.return_expression.is_some() {
-            return_stmt
-                .return_expression
-                .clone()
-                .unwrap()
-                .accept(self, env)?;
+        match &mut return_stmt.return_expression {
+            Some(rt_expr) => {
+                rt_expr.accept(self, env)?;
+            }
+            None => {}
         }
         Ok(())
     }

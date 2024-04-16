@@ -107,9 +107,9 @@ impl Expression {
         visitor.visit_expression(self, env)
     }
 
-    pub fn get_name(&self) -> String {
+    pub fn get_name(&self) -> &String {
         match &self.typ {
-            Expr::Identifier(ref ident) => ident.name.clone(),
+            Expr::Identifier(ref ident) => &ident.name,
             _ => panic!("Not an identifier"),
         }
     }

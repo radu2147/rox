@@ -62,7 +62,7 @@ impl RoxClass {
             let mut end_class = self.clone();
             for (index, arg) in args.iter().enumerate() {
                 end_class.fields.insert(
-                    init_method.params.get(index).unwrap().get_name(),
+                    init_method.params.get(index).unwrap().get_name().clone(),
                     arg.clone(),
                 );
             }
