@@ -96,9 +96,8 @@ impl Parser {
             }
             TokenType::Fun => {
                 let start_line = self.advance().unwrap().line;
-                if let TokenType::Identifier(name, _) = &self.peek().typ {
-                    let name = name.clone();
-                    self.advance();
+                let token = self.advance().unwrap();
+                if let TokenType::Identifier(name, _) = token.typ {
                     self.consume_token(
                         TokenType::LeftBrace,
                         "Expected left brace after function declaration",
@@ -126,9 +125,9 @@ impl Parser {
             }
             TokenType::Var => {
                 let line = self.advance().unwrap().line;
-                if let TokenType::Identifier(name, _) = &self.peek().typ {
-                    let name = name.clone();
-                    let line = self.advance().unwrap().line;
+                let token = self.advance().unwrap();
+                if let TokenType::Identifier(name, _) = token.typ {
+                    let line = token.line;
                     let mut initializer = Expression {
                         from: line,
                         to: line,
@@ -273,7 +272,7 @@ impl Parser {
                     "Expression from while should contain ending brace",
                 )?;
                 let stmt = self.parse_stmt()?;
-                let end_line = stmt.to.clone();
+                let end_line = stmt.to;
                 Ok(Statement {
                     from: start_line,
                     to: end_line,
@@ -318,16 +317,16 @@ impl Parser {
                 )?;
                 let stmt = self.parse_stmt()?;
                 let expr = end_expr.unwrap();
-                let from = expr.from.clone();
-                let to = expr.to.clone();
+                let from = expr.from;
+                let to = expr.to;
                 let while_stmt = Statement {
                     from: start_line,
-                    to: stmt.to.clone(),
+                    to: stmt.to,
                     typ: Stmt::WhileStatement(WhileStatement {
                         expression: expr,
                         statement: Box::new(Statement {
-                            from: stmt.from.clone(),
-                            to: stmt.to.clone(),
+                            from: stmt.from,
+                            to: stmt.to,
                             typ: Stmt::BlockStatement(BlockStatement {
                                 statements: vec![
                                     stmt,
@@ -370,7 +369,7 @@ impl Parser {
                 if let TokenType::Else = self.peek().typ {
                     self.advance();
                     let else_stmt = self.parse_stmt()?;
-                    let end_line = else_stmt.to.clone();
+                    let end_line = else_stmt.to;
                     return Ok(Statement {
                         from: start_line,
                         to: end_line,
@@ -383,7 +382,7 @@ impl Parser {
                 } else {
                     return Ok(Statement {
                         from: start_line,
-                        to: stmt.to.clone(),
+                        to: stmt.to,
                         typ: Stmt::IfStatement(IfStatement {
                             expression: expr,
                             statement: Box::new(stmt),
@@ -400,8 +399,8 @@ impl Parser {
         let expression = self.parse_expression()?;
         self.consume_token(TokenType::Semicolon, "; expected after a print statement")?;
         Ok(Statement {
-            from: expression.from.clone(),
-            to: expression.to.clone(),
+            from: expression.from,
+            to: expression.to,
             typ: Stmt::ExpressionStatement(ExpressionStatement { expression }),
         })
     }
@@ -417,8 +416,8 @@ impl Parser {
             let asignee = self.parse_assignment()?;
             if let Expr::Identifier(ident) = receiver.typ {
                 return Ok(Expression {
-                    from: asignee.from.clone(),
-                    to: receiver.to.clone(),
+                    from: asignee.from,
+                    to: receiver.to,
                     typ: Expr::Assignment(Box::new(AssignmentExpression {
                         name: ident.raw_token,
                         asignee,
@@ -442,8 +441,8 @@ impl Parser {
             rez = {
                 let right_hand = self.parse_and_expression()?;
                 Expression {
-                    from: rez.from.clone(),
-                    to: right_hand.to.clone(),
+                    from: rez.from,
+                    to: right_hand.to,
                     typ: Expr::Binary(Box::new(BinaryExpression {
                         left: rez,
                         operator: op.into(),
@@ -462,8 +461,8 @@ impl Parser {
             rez = {
                 let right_hand = self.parse_equality()?;
                 Expression {
-                    from: rez.from.clone(),
-                    to: right_hand.to.clone(),
+                    from: rez.from,
+                    to: right_hand.to,
                     typ: Expr::Binary(Box::new(BinaryExpression {
                         left: rez,
                         operator: op.into(),
@@ -484,8 +483,8 @@ impl Parser {
                     rez = {
                         let rhs = self.parse_comparison()?;
                         Expression {
-                            from: rez.from.clone(),
-                            to: rhs.to.clone(),
+                            from: rez.from,
+                            to: rhs.to,
                             typ: Expr::Binary(Box::new(BinaryExpression {
                                 left: rez,
                                 operator: op.into(),
@@ -511,8 +510,8 @@ impl Parser {
             rez = {
                 let right_hand = self.parse_term()?;
                 Expression {
-                    from: rez.from.clone(),
-                    to: rez.to.clone(),
+                    from: rez.from,
+                    to: rez.to,
                     typ: Expr::Binary(Box::new(BinaryExpression {
                         left: rez,
                         operator: op.into(),
@@ -531,8 +530,8 @@ impl Parser {
             rez = {
                 let right_hand = self.parse_factor()?;
                 Expression {
-                    from: rez.from.clone(),
-                    to: rez.to.clone(),
+                    from: rez.from,
+                    to: rez.to,
                     typ: Expr::Binary(Box::new(BinaryExpression {
                         left: rez,
                         operator: op.into(),
@@ -551,8 +550,8 @@ impl Parser {
             rez = {
                 let right_hand = self.parse_unary()?;
                 Expression {
-                    from: rez.from.clone(),
-                    to: rez.to.clone(),
+                    from: rez.from,
+                    to: rez.to,
                     typ: Expr::Binary(Box::new(BinaryExpression {
                         left: rez,
                         operator: op.into(),
@@ -588,7 +587,7 @@ impl Parser {
                 if let TokenType::RightBrace = self.peek().typ {
                     let end_line = self.advance().unwrap().line;
                     rez = Expression {
-                        from: rez.from.clone(),
+                        from: rez.from,
                         to: end_line,
                         typ: Expr::CallExpression(Box::new(CallExpression {
                             callee: rez,
@@ -600,7 +599,7 @@ impl Parser {
                     if let TokenType::RightBrace = self.peek().typ {
                         let end_line = self.advance().unwrap().line;
                         rez = Expression {
-                            from: rez.from.clone(),
+                            from: rez.from,
                             to: end_line,
                             typ: Expr::CallExpression(Box::new(CallExpression {
                                 callee: rez,
@@ -655,9 +654,10 @@ impl Parser {
     }
 
     pub fn parse_primary(&mut self) -> Result<Expression, ParseError> {
-        match &self.peek().typ {
+        let token = self.advance().unwrap();
+        match token.typ {
             TokenType::True => {
-                let line = self.advance().unwrap().line;
+                let line = token.line;
                 Ok(Expression {
                     from: line,
                     to: line,
@@ -665,7 +665,7 @@ impl Parser {
                 })
             }
             TokenType::False => {
-                let line = self.advance().unwrap().line;
+                let line = token.line;
                 Ok(Expression {
                     from: line,
                     to: line,
@@ -673,42 +673,40 @@ impl Parser {
                 })
             }
             TokenType::Number(val) => {
-                let value = val.clone();
-                let line = self.advance().unwrap().line;
+                let line = token.line;
                 Ok(Expression {
                     from: line,
                     to: line,
-                    typ: Expr::NumberLiteral(value),
+                    typ: Expr::NumberLiteral(val),
                 })
             }
             TokenType::String(val) => {
-                let value = val.clone();
-                let line = self.advance().unwrap().line;
+                let line = token.line;
                 Ok(Expression {
                     from: line,
                     to: line,
-                    typ: Expr::StringLiteral(value),
+                    typ: Expr::StringLiteral(val),
                 })
             }
-            TokenType::This(_) => {
-                let keyword = self.advance().unwrap();
+            TokenType::This(_) => Ok(Expression {
+                from: token.line,
+                to: token.line,
+                typ: Expr::ThisExpression(Box::new(ThisExpression { keyword: token })),
+            }),
+            TokenType::Identifier(ref name, _) => {
+                let from = token.line;
+                let to = token.line;
                 Ok(Expression {
-                    from: keyword.line,
-                    to: keyword.line,
-                    typ: Expr::ThisExpression(Box::new(ThisExpression { keyword })),
-                })
-            }
-            TokenType::Identifier(name, _) => {
-                let name = name.clone();
-                let raw_token = self.advance().unwrap();
-                Ok(Expression {
-                    from: raw_token.line,
-                    to: raw_token.line,
-                    typ: Expr::Identifier(Identifier { name, raw_token }),
+                    from,
+                    to,
+                    typ: Expr::Identifier(Identifier {
+                        name: name.clone(),
+                        raw_token: token,
+                    }),
                 })
             }
             TokenType::Nil => {
-                let line = self.advance().unwrap().line;
+                let line = token.line;
                 Ok(Expression {
                     from: line,
                     to: line,
@@ -716,7 +714,7 @@ impl Parser {
                 })
             }
             TokenType::LeftBrace => {
-                let start_line = self.advance().unwrap().line;
+                let start_line = token.line;
                 let group_expr = self.parse_expression()?;
                 let end_line = self.consume_token(
                     TokenType::RightBrace,
@@ -732,7 +730,7 @@ impl Parser {
             }
             _ => Err(ParseError {
                 message: "Expression expected".to_string(),
-                line: self.peek().line,
+                line: token.line,
             }),
         }
     }

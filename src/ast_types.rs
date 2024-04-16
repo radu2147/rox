@@ -26,9 +26,9 @@ pub enum Expr {
 }
 
 impl Expression {
-    pub fn get_identifier_name(&self) -> String {
+    pub fn get_identifier_name(&self) -> &str {
         match &self.typ {
-            Expr::Identifier(ident) => ident.name.clone(),
+            Expr::Identifier(ident) => &ident.name,
             _ => panic!("Shouldn't be reachable"),
         }
     }

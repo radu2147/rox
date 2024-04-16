@@ -72,7 +72,7 @@ impl Environment {
         Err(EnvironmentError::new(name))
     }
 
-    pub fn define(&mut self, var: String, value: Value) {
+    pub fn define(&mut self, var: &str, value: Value) {
         self.node.borrow_mut().set(&var, value)
     }
 

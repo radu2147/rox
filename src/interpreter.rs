@@ -41,13 +41,13 @@ pub struct RoxClassInstance {
 
 impl Display for RoxClass {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        return write!(f, "{}", self.name.to_string());
+        return write!(f, "{}", self.name);
     }
 }
 
 impl Display for RoxClassInstance {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        return write!(f, "{} instance", "TGWT");
+        return write!(f, "{} instance", self.class.name);
     }
 }
 
@@ -60,10 +60,11 @@ impl RoxClass {
         let method = self.methods.get("constructor");
         if let Some(init_method) = method {
             let mut end_class = self.clone();
-            for (index, param) in init_method.params.iter().enumerate() {
-                end_class
-                    .fields
-                    .insert(param.get_name(), args.get(index).unwrap().clone());
+            for (index, arg) in args.iter().enumerate() {
+                end_class.fields.insert(
+                    init_method.params.get(index).unwrap().get_name(),
+                    arg.clone(),
+                );
             }
             let instance = RoxClassInstance {
                 fields: HashMap::new(),
@@ -72,7 +73,6 @@ impl RoxClass {
             init_method
                 .clone()
                 .bind(&instance)
-                .clone()
                 .call(interpreter, args)?;
             return Ok(Value::Instance(instance));
         }
@@ -96,7 +96,7 @@ pub struct Callable {
 impl Callable {
     pub fn bind(&mut self, inst: &RoxClassInstance) -> Self {
         let mut env = self.closure.extend();
-        env.define("this".to_string(), Value::Instance(inst.clone()));
+        env.define("this", Value::Instance(inst.clone()));
         Self {
             arity: self.arity,
             body: self.body.clone(),
@@ -106,12 +106,12 @@ impl Callable {
         }
     }
     pub fn call(&mut self, int: &mut Interpreter, args: Vec<Value>) -> Result<Value, RunTimeError> {
-        let mut env = self.closure.extend();
-        for (ind, it) in args.iter().enumerate() {
-            env.define(self.params[ind].get_identifier_name(), it.clone());
-        }
         match self.body {
             Some(ref mut bd) => {
+                let mut env = self.closure.extend();
+                for (ind, it) in args.into_iter().enumerate() {
+                    env.define(self.params[ind].get_identifier_name(), it);
+                }
                 let rez = bd.accept(int, &mut env);
                 match rez {
                     Ok(()) => Ok(Value::Nil),
@@ -134,7 +134,7 @@ impl Callable {
             }
         }
     }
-    pub fn from_node(func: &mut FunctionDeclaration, env: Environment) -> Self {
+    pub fn from_node(func: &FunctionDeclaration, env: Environment) -> Self {
         Self {
             arity: func.params.len() as u8,
             body: Some(*func.body.clone()),
@@ -164,7 +164,7 @@ impl Value {
     pub fn is_truthy(&self) -> bool {
         match self {
             Self::Nil => false,
-            Self::Bool(el) => el.clone(),
+            Self::Bool(el) => *el,
             _ => true,
         }
     }
@@ -286,7 +286,7 @@ impl StatementVisitor<(), RunTimeError> for Interpreter {
             }
         }
         env.define(
-            class_declaration.name.clone(),
+            &class_declaration.name,
             Value::Class(RoxClass {
                 name: class_declaration.name.clone(),
                 methods,
@@ -320,7 +320,7 @@ impl StatementVisitor<(), RunTimeError> for Interpreter {
         env: &mut Environment,
     ) -> Result<(), RunTimeError> {
         env.define(
-            func_dec.name.clone(),
+            &func_dec.name,
             Value::Callable(Callable::from_node(func_dec, env.clone())),
         );
         Ok(())
@@ -331,11 +331,10 @@ impl StatementVisitor<(), RunTimeError> for Interpreter {
         return_stmt: &mut ReturnStatement,
         env: &mut Environment,
     ) -> Result<(), RunTimeError> {
-        let value = return_stmt
-            .return_expression
-            .clone()
-            .unwrap()
-            .accept(self, env)?;
+        let value = match &mut return_stmt.return_expression {
+            Some(vl) => vl.accept(self, env)?,
+            None => Value::Nil,
+        };
         self.ret_val = value;
         Err(RunTimeError {
             message: "".to_string(),
@@ -375,8 +374,8 @@ impl StatementVisitor<(), RunTimeError> for Interpreter {
         decl: &mut VariableDeclarationStatement,
         env: &mut Environment,
     ) -> Result<(), RunTimeError> {
-        let init = { decl.initializer.accept(self, env)?.clone() };
-        env.define(decl.name.clone(), init);
+        let init = { decl.initializer.accept(self, env)? };
+        env.define(&decl.name, init);
         Ok(())
     }
 
@@ -494,7 +493,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
         if let Value::Instance(instance) = instance {
             let mut mthd = instance.class.methods.get(&expr.name.get_variable().name);
             if let Some(ref mut method) = mthd {
-                let value = method.clone().bind(&instance).clone();
+                let value = method.clone().bind(&instance);
                 return Ok(Value::Callable(value));
             }
             let field = instance.class.fields.get(&expr.name.get_variable().name);
@@ -528,13 +527,13 @@ impl Visitor<Value, RunTimeError> for Interpreter {
         let val = expr.asignee.accept(self, env)?;
         let dist = self.locals.get(&expr.name.get_variable());
         let rez = if dist.is_some() {
-            env.assign_at(expr.name.get_variable().name, val.clone(), dist.unwrap())
+            env.assign_at(expr.name.get_variable().name, val, dist.unwrap())
         } else {
-            env.assign(expr.name.get_variable().name, val.clone())
+            env.assign(expr.name.get_variable().name, val)
         };
 
         match rez {
-            Ok(_) => Ok(val),
+            Ok(_) => Ok(Value::Nil),
             Err(e) => Err(RunTimeError {
                 message: e.message,
                 loop_break: false,
@@ -594,15 +593,11 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                 let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env)?;
                 let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
                 match value_left {
-                    Value::Number(nr) => {
-                        Ok(Value::Bool(nr == value_right.get_number(self)?.clone()))
-                    }
+                    Value::Number(nr) => Ok(Value::Bool(nr == *value_right.get_number(self)?)),
                     Value::String(str_l) => {
-                        Ok(Value::Bool(str_l == value_right.get_string(self)?.clone()))
+                        Ok(Value::Bool(str_l == *value_right.get_string(self)?))
                     }
-                    Value::Bool(vl) => {
-                        Ok(Value::Bool(vl == value_right.get_boolean(self)?.clone()))
-                    }
+                    Value::Bool(vl) => Ok(Value::Bool(vl == *value_right.get_boolean(self)?)),
                     Value::Nil => Ok(Value::Bool(value_right.is_nil())),
                     _ => Ok(Value::Bool(false)),
                 }
@@ -611,15 +606,11 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                 let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env)?;
                 let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
                 match value_left {
-                    Value::Number(nr) => {
-                        Ok(Value::Bool(nr != value_right.get_number(self)?.clone()))
-                    }
+                    Value::Number(nr) => Ok(Value::Bool(nr != *value_right.get_number(self)?)),
                     Value::String(str_l) => {
-                        Ok(Value::Bool(str_l != value_right.get_string(self)?.clone()))
+                        Ok(Value::Bool(str_l != *value_right.get_string(self)?))
                     }
-                    Value::Bool(vl) => {
-                        Ok(Value::Bool(vl != value_right.get_boolean(self)?.clone()))
-                    }
+                    Value::Bool(vl) => Ok(Value::Bool(vl != *value_right.get_boolean(self)?)),
                     Value::Nil => Ok(Value::Bool(!value_right.is_nil())),
                     _ => Ok(Value::Bool(false)),
                 }
@@ -629,7 +620,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                 let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
                 match value_left {
                     Value::Number(nr) => {
-                        Ok(Value::Bool(nr >= value_right.get_number(self)?.clone()))
+                        Ok(Value::Bool(nr >= *value_right.get_number(self)?))
                     },
                     _ => {
                         Err(RunTimeError { message: format!("Cannot compare {value_left} with {value_right}. One of them is not a number"), return_error: false,loop_break: false, from: self.location.from, to: self.location.to })
@@ -641,7 +632,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                 let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
                 match value_left {
                     Value::Number(nr) => {
-                        Ok(Value::Bool(nr <= value_right.get_number(self)?.clone()))
+                        Ok(Value::Bool(nr <= *value_right.get_number(self)?))
                     },
                     _ => {
                         Err(RunTimeError { message: format!("Cannot compare {value_left} with {value_right}. One of them is not a number"), return_error: false,loop_break: false, from: self.location.from, to: self.location.to })
@@ -653,7 +644,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                 let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
                 match value_left {
                     Value::Number(nr) => {
-                        Ok(Value::Bool(nr < value_right.get_number(self)?.clone()))
+                        Ok(Value::Bool(nr < *value_right.get_number(self)?))
                     },
                     _ => {
                         Err(RunTimeError { message: format!("Cannot compare {value_left} with {value_right}. One of them is not a number"), return_error: false,loop_break: false, from: self.location.from, to: self.location.to })
@@ -665,7 +656,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                 let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
                 match value_left {
                     Value::Number(nr) => {
-                        Ok(Value::Bool(nr > value_right.get_number(self)?.clone()))
+                        Ok(Value::Bool(nr > *value_right.get_number(self)?))
                     },
                     _ => {
                         Err(RunTimeError { message: format!("Cannot compare {value_left} with {value_right}. One of them is not a number"), return_error: false,loop_break: false, from: self.location.from, to: self.location.to })
@@ -740,7 +731,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                 let value = expr
                     .expression
                     .accept::<Self, Value, RunTimeError>(self, env)?;
-                Ok(Value::Number(-value.get_number(self)?.clone()))
+                Ok(Value::Number(-*value.get_number(self)?))
             }
             _ => Err(RunTimeError {
                 message: format!(
@@ -772,10 +763,10 @@ impl Visitor<Value, RunTimeError> for Interpreter {
     }
 
     fn visit_number_literal(&self, expr: &f32) -> Value {
-        Value::Number(expr.clone())
+        Value::Number(*expr)
     }
 
     fn visit_bool_literal(&self, expr: &bool) -> Value {
-        Value::Bool(expr.clone())
+        Value::Bool(*expr)
     }
 }

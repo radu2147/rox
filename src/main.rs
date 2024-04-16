@@ -83,7 +83,7 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     let mut environment = Environment::new();
     environment.define(
-        "clock".to_string(),
+        "clock",
         Value::Callable(Callable {
             arity: 0,
             params: vec![],
