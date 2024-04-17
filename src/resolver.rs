@@ -16,7 +16,7 @@ use std::collections::HashMap;
 
 pub struct Resolver<'a> {
     pub interpreter: &'a mut Interpreter,
-    scopes: Vec<HashMap<&'a String, bool>>,
+    scopes: Vec<HashMap<String, bool>>,
     ln: usize,
     current_function: FunctionType,
     current_type: ClassType,
@@ -95,20 +95,20 @@ impl<'a> Resolver<'a> {
         self.ln -= 1;
     }
 
-    fn declare(&mut self, lexeme: &String) {
+    fn declare(&mut self, lexeme: &str) {
         if self.ln == 0 {
             return;
         }
         let mut scope = self.scopes.get_mut(self.ln - 1).unwrap();
-        scope.insert(lexeme, false);
+        scope.insert(lexeme.to_string(), false);
     }
 
-    fn define(&mut self, lexeme: &String) {
+    fn define(&mut self, lexeme: &str) {
         if self.ln == 0 {
             return;
         }
         let mut scope = self.scopes.get_mut(self.ln - 1).unwrap();
-        scope.entry(lexeme).and_modify(|v| *v = true);
+        scope.entry(lexeme.to_string()).and_modify(|v| *v = true);
     }
 
     fn resolve_local(&mut self, expr: &Token) {

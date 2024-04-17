@@ -146,7 +146,7 @@ impl Callable {
 }
 
 impl Display for Value {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let str = match self {
             Self::Nil => "Nil".to_string(),
             Self::Bool(bl) => bl.to_string(),
