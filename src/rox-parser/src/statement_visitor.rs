@@ -1,8 +1,8 @@
-use crate::stmt::{
+use crate::statement::{
     BlockStatement, ClassDeclaration, ExpressionStatement, FunctionDeclaration, IfStatement,
     PrintStatement, ReturnStatement, Statement, Stmt, VariableDeclarationStatement, WhileStatement,
 };
-use crate::types::Location;
+use crate::token::Location;
 
 pub trait StatementVisitor<V, E> {
     fn set_current_location(&mut self, location: Location);
@@ -29,7 +29,7 @@ pub trait StatementVisitor<V, E> {
     fn visit_break_statement(&mut self) -> Result<V, E>;
 
     fn visit_class_declaration(&mut self, class_declaration: &mut ClassDeclaration)
-        -> Result<V, E>;
+                               -> Result<V, E>;
 
     fn visit_if_statement(&mut self, if_statement: &mut IfStatement) -> Result<V, E>;
     fn visit_function_declaration(&mut self, func_dec: &mut FunctionDeclaration) -> Result<V, E>;

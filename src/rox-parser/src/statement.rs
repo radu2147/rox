@@ -1,7 +1,6 @@
-use crate::ast_types::Expression;
-use crate::environment::Environment;
+use crate::expression::Expression;
 use crate::statement_visitor::{OwnedStatementVisitor, StatementVisitor};
-use crate::types::Token;
+use crate::token::Token;
 
 #[derive(Debug, Clone)]
 pub struct Statement {

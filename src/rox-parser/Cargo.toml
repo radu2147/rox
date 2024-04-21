@@ -1,5 +1,5 @@
 [package]
-name = "simba"
+name = "rox-parser"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,6 +7,4 @@ edition = "2021"
 
 [dependencies]
 uuid = { version = "1.8.0", features = ["v4"] }
-rox-parser = { path = "src/rox-parser" }
-rox-interpreter = { path = "src/rox-interpreter" }
-rox-errors = { path = "src/rox-errors" }
+rox-errors = { path = "../rox-errors" }

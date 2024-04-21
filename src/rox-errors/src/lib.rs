@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate macro_errors;
+
 pub trait InterpreterError {
     fn error(&self) -> String;
 }

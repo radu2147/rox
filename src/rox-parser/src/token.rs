@@ -1,4 +1,4 @@
-use crate::ast_types::Operator;
+use crate::expression::Operator;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Token {
@@ -97,6 +97,6 @@ pub struct VariableToken {
 
 #[derive(Debug, Clone)]
 pub struct Location {
-    pub(crate) from: u128,
-    pub(crate) to: u128,
+    pub from: u128,
+    pub to: u128,
 }

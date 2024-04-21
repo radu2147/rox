@@ -1,16 +1,16 @@
-use crate::ast_types::{
+use rox_parser::expression::{
     AssignmentExpression, BinaryExpression, CallExpression, GroupExpression, Identifier,
     MemberExpression, ThisExpression, UnaryExpression,
 };
-use crate::errors::ResolverError;
-use crate::expression_visitor::Visitor;
-use crate::interpreter::Interpreter;
-use crate::statement_visitor::StatementVisitor;
-use crate::stmt::{
+use rox_errors::ResolverError;
+use rox_parser::expression_visitor::Visitor;
+use crate::Interpreter;
+use rox_parser::statement_visitor::StatementVisitor;
+use rox_parser::statement::{
     BlockStatement, ClassDeclaration, ExpressionStatement, FunctionDeclaration, IfStatement,
     PrintStatement, ReturnStatement, Statement, Stmt, VariableDeclarationStatement, WhileStatement,
 };
-use crate::types::{Location, Token};
+use rox_parser::token::{Location, Token};
 use std::collections::HashMap;
 
 pub struct Resolver<'a> {

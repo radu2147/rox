@@ -1,28 +1,19 @@
-#[macro_use]
-extern crate macro_errors;
-mod ast_types;
-mod environment;
-mod errors;
-mod expression_visitor;
-mod interpreter;
-mod parser;
-mod resolver;
-mod scanner;
-mod statement_visitor;
-mod stmt;
-mod types;
+extern crate rox_errors;
+extern crate rox_interpreter;
+extern crate rox_parser;
 
-use crate::environment::Environment;
-use crate::errors::InterpreterError;
-use crate::interpreter::{Callable, Interpreter, Value};
-use crate::parser::Parser;
-use crate::resolver::Resolver;
-use crate::scanner::Scanner;
-use crate::types::Location;
+use rox_errors::log_error;
+use rox_errors::InterpreterError;
+use rox_interpreter::environment::Environment;
+use rox_interpreter::resolver::Resolver;
+use rox_interpreter::value::{Callable, Value};
+use rox_interpreter::Interpreter;
+use rox_parser::scanner::Scanner;
+use rox_parser::token::Location;
+use rox_parser::Parser;
 use std::collections::HashMap;
 use std::env;
 use std::fs;
-use std::io::Write;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn run(code: String, env: Environment) {

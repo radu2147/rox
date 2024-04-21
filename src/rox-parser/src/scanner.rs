@@ -1,5 +1,5 @@
-use crate::errors::ParseError;
-use crate::types::{Token, TokenType};
+use rox_errors::ParseError;
+use crate::token::{Token, TokenType};
 use uuid::Uuid;
 
 pub struct Scanner {

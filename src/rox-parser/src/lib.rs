@@ -1,13 +1,21 @@
-use crate::ast_types::{
+extern crate rox_errors;
+pub mod token;
+pub mod scanner;
+pub mod expression;
+pub mod expression_visitor;
+pub mod statement;
+pub mod statement_visitor;
+
+use crate::expression::{
     AssignmentExpression, BinaryExpression, CallExpression, Expr, Expression, GroupExpression,
     Identifier, MemberExpression, ThisExpression, UnaryExpression,
 };
-use crate::errors::ParseError;
-use crate::stmt::{
+use rox_errors::ParseError;
+use crate::statement::{
     BlockStatement, ClassDeclaration, ExpressionStatement, FunctionDeclaration, IfStatement,
     PrintStatement, ReturnStatement, Statement, Stmt, VariableDeclarationStatement, WhileStatement,
 };
-use crate::types::{Token, TokenType};
+use crate::token::{Token, TokenType};
 use std::iter::Peekable;
 use std::vec::IntoIter;
 

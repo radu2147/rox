@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
-use crate::errors::EnvironmentError;
-use crate::interpreter::Value;
+use rox_errors::EnvironmentError;
+use crate::value::Value;
 use std::cell::RefCell;
 use std::rc::Rc;
 

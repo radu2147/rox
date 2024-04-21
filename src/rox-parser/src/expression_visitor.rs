@@ -1,8 +1,8 @@
-use crate::ast_types::{
+use crate::expression::{
     AssignmentExpression, BinaryExpression, CallExpression, Expr, Expression, GroupExpression,
     Identifier, MemberExpression, ThisExpression, UnaryExpression,
 };
-use crate::types::Location;
+use crate::token::Location;
 
 pub trait Visitor<V, E> {
     fn set_current_location(&mut self, location: Location);

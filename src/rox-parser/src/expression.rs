@@ -1,5 +1,5 @@
 use crate::expression_visitor::{OwnedVisitor, Visitor};
-use crate::types::Token;
+use crate::token::Token;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Expression {
