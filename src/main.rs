@@ -25,7 +25,7 @@ use std::fs;
 use std::io::Write;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-fn run(code: String, env: &mut Environment) {
+fn run(code: String, env: Environment) {
     let copy_code = code.clone();
     let mut scanner = Scanner::new(code.clone());
     let mut parser;
@@ -42,11 +42,12 @@ fn run(code: String, env: &mut Environment) {
         ret_val: Value::Nil,
         locals: HashMap::new(),
         location: Location { from: 0, to: 0 },
+        environment: env,
     };
     let mut resolver = Resolver::new(&mut interpreter);
     match parser.parse_program() {
-        Ok(mut t) => match resolver.resolve(env, &mut t) {
-            Ok(()) => match interpreter.interpret(t, env) {
+        Ok(mut t) => match resolver.resolve(&mut t) {
+            Ok(()) => match interpreter.interpret(t) {
                 Ok(_) => {}
                 Err(e) => {
                     log_error!(copy_code, e, e.from, e.to);
@@ -62,19 +63,7 @@ fn run(code: String, env: &mut Environment) {
     }
 }
 
-fn run_prompt(env: &mut Environment) {
-    loop {
-        print!("> ");
-        std::io::stdout().flush().unwrap();
-        let mut line = String::new();
-        let length = std::io::stdin().read_line(&mut line).unwrap();
-        if length > 0 && line != "".to_string() {
-            run(line, env);
-        }
-    }
-}
-
-fn run_file(filename: &String, env: &mut Environment) {
+fn run_file(filename: &String, env: Environment) {
     let contents = fs::read_to_string(filename).expect("Should have been able to read the file");
     run(contents, env);
 }
@@ -99,9 +88,5 @@ fn main() {
             closure: environment.clone(),
         }),
     );
-    match args.len() {
-        1 => run_prompt(&mut environment),
-        2 => run_file(&args[1], &mut environment),
-        _ => panic!("Wrong use of the interpreter"),
-    }
+    run_file(&args[1], environment);
 }

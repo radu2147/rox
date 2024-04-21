@@ -79,19 +79,11 @@ pub struct BlockStatement {
 }
 
 impl Statement {
-    pub fn accept_ref<T: StatementVisitor<V, E>, V, E>(
-        &mut self,
-        visitor: &mut T,
-        env: &mut Environment,
-    ) -> Result<V, E> {
-        visitor.visit_statement(self, env)
+    pub fn accept_ref<T: StatementVisitor<V, E>, V, E>(&mut self, visitor: &mut T) -> Result<V, E> {
+        visitor.visit_statement(self)
     }
 
-    pub fn accept<T: OwnedStatementVisitor<V, E>, V, E>(
-        self,
-        visitor: &mut T,
-        env: &mut Environment,
-    ) -> Result<V, E> {
-        visitor.visit_statement(self, env)
+    pub fn accept<T: OwnedStatementVisitor<V, E>, V, E>(self, visitor: &mut T) -> Result<V, E> {
+        visitor.visit_statement(self)
     }
 }

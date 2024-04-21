@@ -112,7 +112,10 @@ impl Callable {
                 for (ind, it) in args.into_iter().enumerate() {
                     env.define(self.params[ind].get_identifier_name().to_string(), it);
                 }
-                let rez = bd.clone().accept(int, &mut env);
+                let copy_env = int.environment.clone();
+                int.environment = env;
+                let rez = bd.clone().accept(int);
+                int.environment = copy_env;
                 match rez {
                     Ok(()) => Ok(Value::Nil),
                     Err(e) => {
@@ -241,16 +244,13 @@ pub struct Interpreter {
     pub ret_val: Value,
     pub locals: HashMap<VariableToken, u32>,
     pub location: Location,
+    pub environment: Environment,
 }
 
 impl Interpreter {
-    pub fn interpret(
-        &mut self,
-        stmts: Vec<Statement>,
-        env: &mut Environment,
-    ) -> Result<(), RunTimeError> {
+    pub fn interpret(&mut self, stmts: Vec<Statement>) -> Result<(), RunTimeError> {
         for mut stmt in stmts {
-            stmt.accept::<Self, (), RunTimeError>(self, env)?;
+            stmt.accept::<Self, (), RunTimeError>(self)?;
         }
         Ok(())
     }
@@ -265,7 +265,7 @@ impl OwnedStatementVisitor<(), RunTimeError> for Interpreter {
         self.location = location;
     }
 
-    fn visit_break_statement(&mut self, _env: &mut Environment) -> Result<(), RunTimeError> {
+    fn visit_break_statement(&mut self) -> Result<(), RunTimeError> {
         Err(RunTimeError {
             message: "".to_string(),
             return_error: false,
@@ -278,24 +278,23 @@ impl OwnedStatementVisitor<(), RunTimeError> for Interpreter {
     fn visit_class_declaration(
         &mut self,
         class_declaration: ClassDeclaration,
-        env: &mut Environment,
     ) -> Result<(), RunTimeError> {
         let mut methods = HashMap::new();
         let mut fields = HashMap::new();
         for field in class_declaration.fields {
             if let Stmt::VarDeclarationStatement(func_dec) = field.typ {
-                fields.insert(func_dec.name, func_dec.initializer.accept(self, env)?);
+                fields.insert(func_dec.name, func_dec.initializer.accept(self)?);
             }
         }
         for method in class_declaration.methods {
             if let Stmt::FunctionDeclaration(func_dec) = method.typ {
                 methods.insert(
                     func_dec.name,
-                    Callable::from_node(func_dec.params, *func_dec.body, env.clone()),
+                    Callable::from_node(func_dec.params, *func_dec.body, self.environment.clone()),
                 );
             }
         }
-        env.define(
+        self.environment.define(
             class_declaration.name.clone(),
             Value::Class(RoxClass {
                 name: class_declaration.name,
@@ -306,17 +305,13 @@ impl OwnedStatementVisitor<(), RunTimeError> for Interpreter {
         Ok(())
     }
 
-    fn visit_if_statement(
-        &mut self,
-        if_statement: IfStatement,
-        env: &mut Environment,
-    ) -> Result<(), RunTimeError> {
-        if if_statement.expression.accept(self, env)?.is_truthy() {
-            if_statement.statement.accept(self, env)?;
+    fn visit_if_statement(&mut self, if_statement: IfStatement) -> Result<(), RunTimeError> {
+        if if_statement.expression.accept(self)?.is_truthy() {
+            if_statement.statement.accept(self)?;
         } else {
             match if_statement.else_statement {
                 Some(stmt) => {
-                    stmt.accept(self, env)?;
+                    stmt.accept(self)?;
                 }
                 None => {}
             };
@@ -327,26 +322,21 @@ impl OwnedStatementVisitor<(), RunTimeError> for Interpreter {
     fn visit_function_declaration(
         &mut self,
         func_dec: FunctionDeclaration,
-        env: &mut Environment,
     ) -> Result<(), RunTimeError> {
-        env.define(
+        self.environment.define(
             func_dec.name,
             Value::Callable(Callable::from_node(
                 func_dec.params,
                 *func_dec.body,
-                env.clone(),
+                self.environment.clone(),
             )),
         );
         Ok(())
     }
 
-    fn visit_return_statement(
-        &mut self,
-        return_stmt: ReturnStatement,
-        env: &mut Environment,
-    ) -> Result<(), RunTimeError> {
+    fn visit_return_statement(&mut self, return_stmt: ReturnStatement) -> Result<(), RunTimeError> {
         let value = match return_stmt.return_expression {
-            Some(vl) => vl.accept(self, env)?,
+            Some(vl) => vl.accept(self)?,
             None => Value::Nil,
         };
         self.ret_val = value;
@@ -362,16 +352,15 @@ impl OwnedStatementVisitor<(), RunTimeError> for Interpreter {
     fn visit_while_statement(
         &mut self,
         while_statement: WhileStatement,
-        env: &mut Environment,
     ) -> Result<(), RunTimeError> {
         loop {
             let expr = while_statement.expression.clone();
             let stmt = while_statement.statement.clone();
-            let cond = expr.accept(self, env)?;
+            let cond = expr.accept(self)?;
             if !cond.is_truthy() {
                 break;
             }
-            match stmt.accept(self, env) {
+            match stmt.accept(self) {
                 Ok(()) => {}
                 Err(e) => {
                     if e.loop_break {
@@ -388,40 +377,33 @@ impl OwnedStatementVisitor<(), RunTimeError> for Interpreter {
     fn visit_declaration_statement(
         &mut self,
         decl: VariableDeclarationStatement,
-        env: &mut Environment,
     ) -> Result<(), RunTimeError> {
-        let init = { decl.initializer.accept(self, env)? };
-        env.define(decl.name, init);
+        let init = { decl.initializer.accept(self)? };
+        self.environment.define(decl.name, init);
         Ok(())
     }
 
-    fn visit_block_statement(
-        &mut self,
-        decl: BlockStatement,
-        env: &mut Environment,
-    ) -> Result<(), RunTimeError> {
-        let mut child_env = env.extend();
+    fn visit_block_statement(&mut self, decl: BlockStatement) -> Result<(), RunTimeError> {
+        let copy = self.environment.clone();
+        let mut child_env = self.environment.extend();
+        self.environment = child_env;
         for mut stmt in decl.statements {
-            stmt.accept(self, &mut child_env)?;
+            stmt.accept(self)?;
         }
+        self.environment = copy;
         return Ok(());
     }
 
     fn visit_statement_expression(
         &mut self,
         expr: ExpressionStatement,
-        env: &mut Environment,
     ) -> Result<(), RunTimeError> {
-        expr.expression.accept(self, env)?;
+        expr.expression.accept(self)?;
         return Ok(());
     }
 
-    fn visit_print_statement(
-        &mut self,
-        expr: PrintStatement,
-        env: &mut Environment,
-    ) -> Result<(), RunTimeError> {
-        println!("{}", expr.expression.accept(self, env)?);
+    fn visit_print_statement(&mut self, expr: PrintStatement) -> Result<(), RunTimeError> {
+        println!("{}", expr.expression.accept(self)?);
         return Ok(());
     }
 }
@@ -431,16 +413,12 @@ impl OwnedVisitor<Value, RunTimeError> for Interpreter {
         self.location = location;
     }
 
-    fn visit_this_expression(
-        &mut self,
-        expr: ThisExpression,
-        env: &mut Environment,
-    ) -> Result<Value, RunTimeError> {
+    fn visit_this_expression(&mut self, expr: ThisExpression) -> Result<Value, RunTimeError> {
         let dist = self.locals.get(&expr.keyword.get_variable());
         let val = if dist.is_some() {
-            env.get_at(&"this".to_string(), dist.unwrap())
+            self.environment.get_at(&"this".to_string(), dist.unwrap())
         } else {
-            env.get(&"this".to_string())
+            self.environment.get(&"this".to_string())
         };
 
         match val {
@@ -455,16 +433,12 @@ impl OwnedVisitor<Value, RunTimeError> for Interpreter {
         }
     }
 
-    fn visit_call_expression(
-        &mut self,
-        expr: CallExpression,
-        env: &mut Environment,
-    ) -> Result<Value, RunTimeError> {
-        let callable = expr.callee.accept(self, env)?;
+    fn visit_call_expression(&mut self, expr: CallExpression) -> Result<Value, RunTimeError> {
+        let callable = expr.callee.accept(self)?;
         if let Value::Callable(mut callable) = callable {
             let mut args = Vec::new();
             for arg in expr.arguments {
-                args.push(arg.accept(self, env)?);
+                args.push(arg.accept(self)?);
             }
 
             if args.len() != callable.arity as usize {
@@ -486,7 +460,7 @@ impl OwnedVisitor<Value, RunTimeError> for Interpreter {
         if let Value::Class(class) = callable {
             let mut args = Vec::new();
             for arg in expr.arguments {
-                args.push(arg.accept(self, env)?);
+                args.push(arg.accept(self)?);
             }
             return Ok(class.constructor(self, args)?);
         }
@@ -499,12 +473,8 @@ impl OwnedVisitor<Value, RunTimeError> for Interpreter {
         });
     }
 
-    fn visit_member_expression(
-        &mut self,
-        expr: MemberExpression,
-        env: &mut Environment,
-    ) -> Result<Value, RunTimeError> {
-        let instance = expr.object.accept(self, env)?;
+    fn visit_member_expression(&mut self, expr: MemberExpression) -> Result<Value, RunTimeError> {
+        let instance = expr.object.accept(self)?;
         if let Value::Instance(instance) = instance {
             let mut mthd = instance.class.methods.get(&expr.name.get_variable().name);
             if let Some(ref mut method) = mthd {
@@ -537,14 +507,14 @@ impl OwnedVisitor<Value, RunTimeError> for Interpreter {
     fn visit_assignement_expression(
         &mut self,
         expr: AssignmentExpression,
-        env: &mut Environment,
     ) -> Result<Value, RunTimeError> {
-        let val = expr.asignee.accept(self, env)?;
+        let val = expr.asignee.accept(self)?;
         let dist = self.locals.get(&expr.name.get_variable());
         let rez = if dist.is_some() {
-            env.assign_at(expr.name.get_variable().name, val, dist.unwrap())
+            self.environment
+                .assign_at(expr.name.get_variable().name, val, dist.unwrap())
         } else {
-            env.assign(expr.name.get_variable().name, val)
+            self.environment.assign(expr.name.get_variable().name, val)
         };
 
         match rez {
@@ -559,22 +529,18 @@ impl OwnedVisitor<Value, RunTimeError> for Interpreter {
         }
     }
 
-    fn visit_binary_expression(
-        &mut self,
-        expr: BinaryExpression,
-        env: &mut Environment,
-    ) -> Result<Value, RunTimeError> {
+    fn visit_binary_expression(&mut self, expr: BinaryExpression) -> Result<Value, RunTimeError> {
         return match expr.operator {
             Operator::Div => {
-                let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env);
-                let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env);
+                let value_left = expr.left.accept::<Self, Value, RunTimeError>(self);
+                let value_right = expr.right.accept::<Self, Value, RunTimeError>(self);
                 Ok(Value::Number(
                     value_left?.get_number(self)? / value_right?.get_number(self)?,
                 ))
             }
             Operator::Plus => {
-                let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env)?;
-                let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
+                let value_left = expr.left.accept::<Self, Value, RunTimeError>(self)?;
+                let value_right = expr.right.accept::<Self, Value, RunTimeError>(self)?;
                 match value_left {
                     Value::Number(el) => Ok(Value::Number(value_right.get_number(self)? + el)),
                     Value::String(st) => Ok(Value::String(
@@ -591,22 +557,22 @@ impl OwnedVisitor<Value, RunTimeError> for Interpreter {
                 }
             }
             Operator::Minus => {
-                let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env);
-                let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env);
+                let value_left = expr.left.accept::<Self, Value, RunTimeError>(self);
+                let value_right = expr.right.accept::<Self, Value, RunTimeError>(self);
                 Ok(Value::Number(
                     value_left?.get_number(self)? - value_right?.get_number(self)?,
                 ))
             }
             Operator::Mul => {
-                let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env);
-                let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env);
+                let value_left = expr.left.accept::<Self, Value, RunTimeError>(self);
+                let value_right = expr.right.accept::<Self, Value, RunTimeError>(self);
                 Ok(Value::Number(
                     value_left?.get_number(self)? * value_right?.get_number(self)?,
                 ))
             }
             Operator::EQ => {
-                let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env)?;
-                let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
+                let value_left = expr.left.accept::<Self, Value, RunTimeError>(self)?;
+                let value_right = expr.right.accept::<Self, Value, RunTimeError>(self)?;
                 match value_left {
                     Value::Number(nr) => Ok(Value::Bool(nr == *value_right.get_number(self)?)),
                     Value::String(str_l) => {
@@ -618,8 +584,8 @@ impl OwnedVisitor<Value, RunTimeError> for Interpreter {
                 }
             }
             Operator::NotEqual => {
-                let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env)?;
-                let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
+                let value_left = expr.left.accept::<Self, Value, RunTimeError>(self)?;
+                let value_right = expr.right.accept::<Self, Value, RunTimeError>(self)?;
                 match value_left {
                     Value::Number(nr) => Ok(Value::Bool(nr != *value_right.get_number(self)?)),
                     Value::String(str_l) => {
@@ -631,8 +597,8 @@ impl OwnedVisitor<Value, RunTimeError> for Interpreter {
                 }
             }
             Operator::GE => {
-                let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env)?;
-                let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
+                let value_left = expr.left.accept::<Self, Value, RunTimeError>(self)?;
+                let value_right = expr.right.accept::<Self, Value, RunTimeError>(self)?;
                 match value_left {
                     Value::Number(nr) => {
                         Ok(Value::Bool(nr >= *value_right.get_number(self)?))
@@ -643,8 +609,8 @@ impl OwnedVisitor<Value, RunTimeError> for Interpreter {
                 }
             }
             Operator::LE => {
-                let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env)?;
-                let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
+                let value_left = expr.left.accept::<Self, Value, RunTimeError>(self)?;
+                let value_right = expr.right.accept::<Self, Value, RunTimeError>(self)?;
                 match value_left {
                     Value::Number(nr) => {
                         Ok(Value::Bool(nr <= *value_right.get_number(self)?))
@@ -655,8 +621,8 @@ impl OwnedVisitor<Value, RunTimeError> for Interpreter {
                 }
             }
             Operator::Less => {
-                let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env)?;
-                let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
+                let value_left = expr.left.accept::<Self, Value, RunTimeError>(self)?;
+                let value_right = expr.right.accept::<Self, Value, RunTimeError>(self)?;
                 match value_left {
                     Value::Number(nr) => {
                         Ok(Value::Bool(nr < *value_right.get_number(self)?))
@@ -667,8 +633,8 @@ impl OwnedVisitor<Value, RunTimeError> for Interpreter {
                 }
             }
             Operator::Greater => {
-                let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env)?;
-                let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
+                let value_left = expr.left.accept::<Self, Value, RunTimeError>(self)?;
+                let value_right = expr.right.accept::<Self, Value, RunTimeError>(self)?;
                 match value_left {
                     Value::Number(nr) => {
                         Ok(Value::Bool(nr > *value_right.get_number(self)?))
@@ -679,19 +645,19 @@ impl OwnedVisitor<Value, RunTimeError> for Interpreter {
                 }
             }
             Operator::And => {
-                let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env)?;
+                let value_left = expr.left.accept::<Self, Value, RunTimeError>(self)?;
                 if !value_left.is_truthy() {
                     return Ok(value_left);
                 }
-                let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
+                let value_right = expr.right.accept::<Self, Value, RunTimeError>(self)?;
                 Ok(value_right)
             }
             Operator::Or => {
-                let value_left = expr.left.accept::<Self, Value, RunTimeError>(self, env)?;
+                let value_left = expr.left.accept::<Self, Value, RunTimeError>(self)?;
                 if value_left.is_truthy() {
                     return Ok(value_left);
                 }
-                let value_right = expr.right.accept::<Self, Value, RunTimeError>(self, env)?;
+                let value_right = expr.right.accept::<Self, Value, RunTimeError>(self)?;
                 Ok(value_right)
             }
             _ => Err(RunTimeError {
@@ -707,16 +673,12 @@ impl OwnedVisitor<Value, RunTimeError> for Interpreter {
         };
     }
 
-    fn visit_identifier_expression(
-        &mut self,
-        expr: Identifier,
-        env: &Environment,
-    ) -> Result<Value, RunTimeError> {
+    fn visit_identifier_expression(&mut self, expr: Identifier) -> Result<Value, RunTimeError> {
         let dist = self.locals.get(&expr.raw_token.get_variable());
         let val = if dist.is_some() {
-            env.get_at(&expr.name, dist.unwrap())
+            self.environment.get_at(&expr.name, dist.unwrap())
         } else {
-            env.get(&expr.name)
+            self.environment.get(&expr.name)
         };
         match val {
             Ok(vl) => Ok(vl),
@@ -730,22 +692,16 @@ impl OwnedVisitor<Value, RunTimeError> for Interpreter {
         }
     }
 
-    fn visit_unary_expression(
-        &mut self,
-        expr: UnaryExpression,
-        env: &mut Environment,
-    ) -> Result<Value, RunTimeError> {
+    fn visit_unary_expression(&mut self, expr: UnaryExpression) -> Result<Value, RunTimeError> {
         return match expr.operator {
             Operator::Not => Ok(Value::Bool(
                 !expr
                     .expression
-                    .accept::<Self, Value, RunTimeError>(self, env)?
+                    .accept::<Self, Value, RunTimeError>(self)?
                     .is_truthy(),
             )),
             Operator::Minus => {
-                let value = expr
-                    .expression
-                    .accept::<Self, Value, RunTimeError>(self, env)?;
+                let value = expr.expression.accept::<Self, Value, RunTimeError>(self)?;
                 Ok(Value::Number(-*value.get_number(self)?))
             }
             _ => Err(RunTimeError {
@@ -761,12 +717,8 @@ impl OwnedVisitor<Value, RunTimeError> for Interpreter {
         };
     }
 
-    fn visit_group_expression(
-        &mut self,
-        expr: GroupExpression,
-        env: &mut Environment,
-    ) -> Result<Value, RunTimeError> {
-        expr.expression.accept(self, env)
+    fn visit_group_expression(&mut self, expr: GroupExpression) -> Result<Value, RunTimeError> {
+        expr.expression.accept(self)
     }
 
     fn visit_nil_literal(&self) -> Value {

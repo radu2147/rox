@@ -1,6 +1,12 @@
 class A {
     fun constructor(x){}
+
+    fun test_a(q){
+        return this.x + q;
+    }
 }
 
-var x = A(3);
-print x;
+var a = A(4);
+a = A(2);
+
+print a.test_a(1);

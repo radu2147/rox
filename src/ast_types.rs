@@ -1,4 +1,3 @@
-use crate::environment::Environment;
 use crate::expression_visitor::{OwnedVisitor, Visitor};
 use crate::types::Token;
 
@@ -99,20 +98,12 @@ pub enum Operator {
 }
 
 impl Expression {
-    pub fn accept_ref<T: Visitor<V, E>, V, E>(
-        &mut self,
-        visitor: &mut T,
-        env: &mut Environment,
-    ) -> Result<V, E> {
-        visitor.visit_expression(self, env)
+    pub fn accept_ref<T: Visitor<V, E>, V, E>(&mut self, visitor: &mut T) -> Result<V, E> {
+        visitor.visit_expression(self)
     }
 
-    pub fn accept<T: OwnedVisitor<V, E>, V, E>(
-        self,
-        visitor: &mut T,
-        env: &mut Environment,
-    ) -> Result<V, E> {
-        visitor.visit_expression(self, env)
+    pub fn accept<T: OwnedVisitor<V, E>, V, E>(self, visitor: &mut T) -> Result<V, E> {
+        visitor.visit_expression(self)
     }
 
     pub fn get_name(&self) -> &String {
