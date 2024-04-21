@@ -71,14 +71,14 @@ impl Into<Operator> for Token {
 }
 
 impl Token {
-    pub fn get_variable(&self) -> Variable {
+    pub fn get_variable(&self) -> VariableToken {
         match &self.typ {
-            TokenType::Identifier(name, id) => Variable {
+            TokenType::Identifier(name, id) => VariableToken {
                 name: name.clone(),
                 line: self.line,
                 id: id.clone(),
             },
-            TokenType::This(name) => Variable {
+            TokenType::This(name) => VariableToken {
                 name: name.clone(),
                 line: self.line,
                 id: "1".to_string(),
@@ -89,7 +89,7 @@ impl Token {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Variable {
+pub struct VariableToken {
     pub name: String,
     pub line: u128,
     pub id: String,

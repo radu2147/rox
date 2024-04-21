@@ -30,7 +30,7 @@ impl EnvNode {
         self.map.get(key).map(Clone::clone)
     }
 
-    fn set(&mut self, key: &str, value: Value) {
+    fn set(&mut self, key: String, value: Value) {
         self.map.insert(key.to_owned(), value);
     }
 }
@@ -72,8 +72,8 @@ impl Environment {
         Err(EnvironmentError::new(name))
     }
 
-    pub fn define(&mut self, var: &str, value: Value) {
-        self.node.borrow_mut().set(&var, value)
+    pub fn define(&mut self, var: String, value: Value) {
+        self.node.borrow_mut().set(var, value)
     }
 
     pub fn assign(&mut self, name: String, value: Value) -> Result<(), EnvironmentError> {

@@ -1,6 +1,6 @@
 use crate::ast_types::{
     AssignmentExpression, BinaryExpression, CallExpression, Expr, Expression, GroupExpression,
-    Identifier, MemberExpression, Operator, ThisExpression, UnaryExpression,
+    Identifier, MemberExpression, ThisExpression, UnaryExpression,
 };
 use crate::errors::ParseError;
 use crate::stmt::{
@@ -347,7 +347,7 @@ impl Parser {
                         from: start_line,
                         to,
                         typ: Stmt::BlockStatement(BlockStatement {
-                            statements: vec![init_expr.unwrap(), while_stmt.clone()],
+                            statements: vec![init_expr.unwrap(), while_stmt],
                         }),
                     })
                 } else {

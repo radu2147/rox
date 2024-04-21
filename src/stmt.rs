@@ -1,6 +1,6 @@
 use crate::ast_types::Expression;
 use crate::environment::Environment;
-use crate::statement_visitor::StatementVisitor;
+use crate::statement_visitor::{OwnedStatementVisitor, StatementVisitor};
 use crate::types::Token;
 
 #[derive(Debug, Clone)]
@@ -79,8 +79,16 @@ pub struct BlockStatement {
 }
 
 impl Statement {
-    pub fn accept<T: StatementVisitor<V, E>, V, E>(
+    pub fn accept_ref<T: StatementVisitor<V, E>, V, E>(
         &mut self,
+        visitor: &mut T,
+        env: &mut Environment,
+    ) -> Result<V, E> {
+        visitor.visit_statement(self, env)
+    }
+
+    pub fn accept<T: OwnedStatementVisitor<V, E>, V, E>(
+        self,
         visitor: &mut T,
         env: &mut Environment,
     ) -> Result<V, E> {

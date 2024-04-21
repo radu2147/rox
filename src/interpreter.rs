@@ -4,13 +4,13 @@ use crate::ast_types::{
 };
 use crate::environment::Environment;
 use crate::errors::RunTimeError;
-use crate::expression_visitor::Visitor;
-use crate::statement_visitor::StatementVisitor;
+use crate::expression_visitor::OwnedVisitor;
+use crate::statement_visitor::OwnedStatementVisitor;
 use crate::stmt::{
     BlockStatement, ClassDeclaration, ExpressionStatement, FunctionDeclaration, IfStatement,
     PrintStatement, ReturnStatement, Statement, Stmt, VariableDeclarationStatement, WhileStatement,
 };
-use crate::types::{Location, Token, Variable};
+use crate::types::{Location, Token, VariableToken};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::ops::Add;
@@ -96,7 +96,7 @@ pub struct Callable {
 impl Callable {
     pub fn bind(&mut self, inst: &RoxClassInstance) -> Self {
         let mut env = self.closure.extend();
-        env.define("this", Value::Instance(inst.clone()));
+        env.define("this".to_string(), Value::Instance(inst.clone()));
         Self {
             arity: self.arity,
             body: self.body.clone(),
@@ -110,9 +110,9 @@ impl Callable {
             Some(ref mut bd) => {
                 let mut env = self.closure.extend();
                 for (ind, it) in args.into_iter().enumerate() {
-                    env.define(self.params[ind].get_identifier_name(), it);
+                    env.define(self.params[ind].get_identifier_name().to_string(), it);
                 }
-                let rez = bd.accept(int, &mut env);
+                let rez = bd.clone().accept(int, &mut env);
                 match rez {
                     Ok(()) => Ok(Value::Nil),
                     Err(e) => {
@@ -134,11 +134,11 @@ impl Callable {
             }
         }
     }
-    pub fn from_node(func: &FunctionDeclaration, env: Environment) -> Self {
+    pub fn from_node(func_params: Vec<Expression>, func_body: Statement, env: Environment) -> Self {
         Self {
-            arity: func.params.len() as u8,
-            body: Some(*func.body.clone()),
-            params: func.params.clone(),
+            arity: func_params.len() as u8,
+            body: Some(func_body),
+            params: func_params,
             std_call: None,
             closure: env,
         }
@@ -147,16 +147,29 @@ impl Callable {
 
 impl Display for Value {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let str = match self {
-            Self::Nil => "Nil".to_string(),
-            Self::Bool(bl) => bl.to_string(),
-            Self::Number(nr) => nr.to_string(),
-            Self::String(st) => st.to_string(),
-            Self::Callable(_) => "".to_string(),
-            Self::Class(class_decl) => class_decl.name.to_string(),
-            Self::Instance(class_inst) => class_inst.to_string(),
-        };
-        return write!(f, "{}", str);
+        match self {
+            Self::Nil => {
+                write!(f, "NIL")
+            }
+            Self::Bool(bl) => {
+                write!(f, "{bl}")
+            }
+            Self::Number(nr) => {
+                write!(f, "{nr}")
+            }
+            Self::String(st) => {
+                write!(f, "{st}")
+            }
+            Self::Callable(_) => {
+                write!(f, "")
+            }
+            Self::Class(class_decl) => {
+                write!(f, "{}", class_decl.name)
+            }
+            Self::Instance(class_inst) => {
+                write!(f, "{}", class_inst)
+            }
+        }
     }
 }
 
@@ -176,7 +189,7 @@ impl Value {
             }
             _ => {
                 return Err(RunTimeError {
-                    message: format!("Value {self} is not a number").to_string(),
+                    message: format!("Value {self} is not a number"),
                     return_error: false,
                     loop_break: false,
                     from: interpreter.location.from,
@@ -193,7 +206,7 @@ impl Value {
             }
             _ => {
                 return Err(RunTimeError {
-                    message: format!("Value {self} is not a string").to_string(),
+                    message: format!("Value {self} is not a string"),
                     return_error: false,
                     loop_break: false,
                     from: interpreter.location.from,
@@ -207,7 +220,7 @@ impl Value {
         return match self {
             Self::Bool(x) => Ok(x),
             _ => Err(RunTimeError {
-                message: format!("Value {self} is not a bool").to_string(),
+                message: format!("Value {self} is not a bool"),
                 return_error: false,
                 loop_break: false,
                 from: interpreter.location.from,
@@ -226,17 +239,17 @@ impl Value {
 
 pub struct Interpreter {
     pub ret_val: Value,
-    pub locals: HashMap<Variable, u32>,
+    pub locals: HashMap<VariableToken, u32>,
     pub location: Location,
 }
 
 impl Interpreter {
     pub fn interpret(
         &mut self,
-        stmts: &mut Vec<Statement>,
+        stmts: Vec<Statement>,
         env: &mut Environment,
     ) -> Result<(), RunTimeError> {
-        for stmt in stmts {
+        for mut stmt in stmts {
             stmt.accept::<Self, (), RunTimeError>(self, env)?;
         }
         Ok(())
@@ -247,7 +260,7 @@ impl Interpreter {
     }
 }
 
-impl StatementVisitor<(), RunTimeError> for Interpreter {
+impl OwnedStatementVisitor<(), RunTimeError> for Interpreter {
     fn set_current_location(&mut self, location: Location) {
         self.location = location;
     }
@@ -264,31 +277,28 @@ impl StatementVisitor<(), RunTimeError> for Interpreter {
 
     fn visit_class_declaration(
         &mut self,
-        class_declaration: &mut ClassDeclaration,
+        class_declaration: ClassDeclaration,
         env: &mut Environment,
     ) -> Result<(), RunTimeError> {
         let mut methods = HashMap::new();
         let mut fields = HashMap::new();
-        for field in &mut class_declaration.fields {
-            if let Stmt::VarDeclarationStatement(func_dec) = &mut field.typ {
-                fields.insert(
-                    func_dec.name.clone(),
-                    func_dec.initializer.accept(self, env)?,
-                );
+        for field in class_declaration.fields {
+            if let Stmt::VarDeclarationStatement(func_dec) = field.typ {
+                fields.insert(func_dec.name, func_dec.initializer.accept(self, env)?);
             }
         }
-        for method in &mut class_declaration.methods {
-            if let Stmt::FunctionDeclaration(func_dec) = &mut method.typ {
+        for method in class_declaration.methods {
+            if let Stmt::FunctionDeclaration(func_dec) = method.typ {
                 methods.insert(
-                    func_dec.name.clone(),
-                    Callable::from_node(func_dec, env.clone()),
+                    func_dec.name,
+                    Callable::from_node(func_dec.params, *func_dec.body, env.clone()),
                 );
             }
         }
         env.define(
-            &class_declaration.name,
+            class_declaration.name.clone(),
             Value::Class(RoxClass {
-                name: class_declaration.name.clone(),
+                name: class_declaration.name,
                 methods,
                 fields,
             }),
@@ -298,14 +308,14 @@ impl StatementVisitor<(), RunTimeError> for Interpreter {
 
     fn visit_if_statement(
         &mut self,
-        if_statement: &mut IfStatement,
+        if_statement: IfStatement,
         env: &mut Environment,
     ) -> Result<(), RunTimeError> {
         if if_statement.expression.accept(self, env)?.is_truthy() {
             if_statement.statement.accept(self, env)?;
         } else {
             match if_statement.else_statement {
-                Some(ref mut stmt) => {
+                Some(stmt) => {
                     stmt.accept(self, env)?;
                 }
                 None => {}
@@ -316,22 +326,26 @@ impl StatementVisitor<(), RunTimeError> for Interpreter {
 
     fn visit_function_declaration(
         &mut self,
-        func_dec: &mut FunctionDeclaration,
+        func_dec: FunctionDeclaration,
         env: &mut Environment,
     ) -> Result<(), RunTimeError> {
         env.define(
-            &func_dec.name,
-            Value::Callable(Callable::from_node(func_dec, env.clone())),
+            func_dec.name,
+            Value::Callable(Callable::from_node(
+                func_dec.params,
+                *func_dec.body,
+                env.clone(),
+            )),
         );
         Ok(())
     }
 
     fn visit_return_statement(
         &mut self,
-        return_stmt: &mut ReturnStatement,
+        return_stmt: ReturnStatement,
         env: &mut Environment,
     ) -> Result<(), RunTimeError> {
-        let value = match &mut return_stmt.return_expression {
+        let value = match return_stmt.return_expression {
             Some(vl) => vl.accept(self, env)?,
             None => Value::Nil,
         };
@@ -347,15 +361,17 @@ impl StatementVisitor<(), RunTimeError> for Interpreter {
 
     fn visit_while_statement(
         &mut self,
-        while_statement: &mut WhileStatement,
+        while_statement: WhileStatement,
         env: &mut Environment,
     ) -> Result<(), RunTimeError> {
         loop {
-            let cond = while_statement.expression.accept(self, env)?;
+            let expr = while_statement.expression.clone();
+            let stmt = while_statement.statement.clone();
+            let cond = expr.accept(self, env)?;
             if !cond.is_truthy() {
                 break;
             }
-            match while_statement.statement.accept(self, env) {
+            match stmt.accept(self, env) {
                 Ok(()) => {}
                 Err(e) => {
                     if e.loop_break {
@@ -371,21 +387,21 @@ impl StatementVisitor<(), RunTimeError> for Interpreter {
 
     fn visit_declaration_statement(
         &mut self,
-        decl: &mut VariableDeclarationStatement,
+        decl: VariableDeclarationStatement,
         env: &mut Environment,
     ) -> Result<(), RunTimeError> {
         let init = { decl.initializer.accept(self, env)? };
-        env.define(&decl.name, init);
+        env.define(decl.name, init);
         Ok(())
     }
 
     fn visit_block_statement(
         &mut self,
-        decl: &mut BlockStatement,
+        decl: BlockStatement,
         env: &mut Environment,
     ) -> Result<(), RunTimeError> {
         let mut child_env = env.extend();
-        for stmt in &mut decl.statements {
+        for mut stmt in decl.statements {
             stmt.accept(self, &mut child_env)?;
         }
         return Ok(());
@@ -393,7 +409,7 @@ impl StatementVisitor<(), RunTimeError> for Interpreter {
 
     fn visit_statement_expression(
         &mut self,
-        expr: &mut ExpressionStatement,
+        expr: ExpressionStatement,
         env: &mut Environment,
     ) -> Result<(), RunTimeError> {
         expr.expression.accept(self, env)?;
@@ -402,7 +418,7 @@ impl StatementVisitor<(), RunTimeError> for Interpreter {
 
     fn visit_print_statement(
         &mut self,
-        expr: &mut PrintStatement,
+        expr: PrintStatement,
         env: &mut Environment,
     ) -> Result<(), RunTimeError> {
         println!("{}", expr.expression.accept(self, env)?);
@@ -410,14 +426,14 @@ impl StatementVisitor<(), RunTimeError> for Interpreter {
     }
 }
 
-impl Visitor<Value, RunTimeError> for Interpreter {
+impl OwnedVisitor<Value, RunTimeError> for Interpreter {
     fn set_current_location(&mut self, location: Location) {
         self.location = location;
     }
 
     fn visit_this_expression(
         &mut self,
-        expr: &mut ThisExpression,
+        expr: ThisExpression,
         env: &mut Environment,
     ) -> Result<Value, RunTimeError> {
         let dist = self.locals.get(&expr.keyword.get_variable());
@@ -441,13 +457,13 @@ impl Visitor<Value, RunTimeError> for Interpreter {
 
     fn visit_call_expression(
         &mut self,
-        expr: &mut CallExpression,
+        expr: CallExpression,
         env: &mut Environment,
     ) -> Result<Value, RunTimeError> {
         let callable = expr.callee.accept(self, env)?;
         if let Value::Callable(mut callable) = callable {
             let mut args = Vec::new();
-            for arg in &mut expr.arguments {
+            for arg in expr.arguments {
                 args.push(arg.accept(self, env)?);
             }
 
@@ -457,8 +473,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                         "Expected {} arguments, but found {}",
                         callable.arity,
                         args.len()
-                    )
-                    .to_string(),
+                    ),
                     return_error: false,
                     loop_break: false,
                     from: self.location.from,
@@ -470,7 +485,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
         }
         if let Value::Class(class) = callable {
             let mut args = Vec::new();
-            for arg in &mut expr.arguments {
+            for arg in expr.arguments {
                 args.push(arg.accept(self, env)?);
             }
             return Ok(class.constructor(self, args)?);
@@ -486,7 +501,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
 
     fn visit_member_expression(
         &mut self,
-        expr: &mut MemberExpression,
+        expr: MemberExpression,
         env: &mut Environment,
     ) -> Result<Value, RunTimeError> {
         let instance = expr.object.accept(self, env)?;
@@ -501,7 +516,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
                 return Ok(value.clone());
             } else {
                 return Err(RunTimeError {
-                    message: format!("No such field for {}", instance.to_string()).to_string(),
+                    message: format!("No such field for {}", instance.to_string()),
                     return_error: false,
                     loop_break: false,
                     from: self.location.from,
@@ -521,7 +536,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
 
     fn visit_assignement_expression(
         &mut self,
-        expr: &mut AssignmentExpression,
+        expr: AssignmentExpression,
         env: &mut Environment,
     ) -> Result<Value, RunTimeError> {
         let val = expr.asignee.accept(self, env)?;
@@ -546,7 +561,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
 
     fn visit_binary_expression(
         &mut self,
-        expr: &mut BinaryExpression,
+        expr: BinaryExpression,
         env: &mut Environment,
     ) -> Result<Value, RunTimeError> {
         return match expr.operator {
@@ -694,7 +709,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
 
     fn visit_identifier_expression(
         &mut self,
-        expr: &Identifier,
+        expr: Identifier,
         env: &Environment,
     ) -> Result<Value, RunTimeError> {
         let dist = self.locals.get(&expr.raw_token.get_variable());
@@ -717,7 +732,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
 
     fn visit_unary_expression(
         &mut self,
-        expr: &mut UnaryExpression,
+        expr: UnaryExpression,
         env: &mut Environment,
     ) -> Result<Value, RunTimeError> {
         return match expr.operator {
@@ -748,7 +763,7 @@ impl Visitor<Value, RunTimeError> for Interpreter {
 
     fn visit_group_expression(
         &mut self,
-        expr: &mut GroupExpression,
+        expr: GroupExpression,
         env: &mut Environment,
     ) -> Result<Value, RunTimeError> {
         expr.expression.accept(self, env)
@@ -758,15 +773,15 @@ impl Visitor<Value, RunTimeError> for Interpreter {
         Value::Nil
     }
 
-    fn visit_string_literal(&self, expr: &String) -> Value {
-        Value::String(expr.clone())
+    fn visit_string_literal(&self, expr: String) -> Value {
+        Value::String(expr)
     }
 
-    fn visit_number_literal(&self, expr: &f32) -> Value {
-        Value::Number(*expr)
+    fn visit_number_literal(&self, expr: f32) -> Value {
+        Value::Number(expr)
     }
 
-    fn visit_bool_literal(&self, expr: &bool) -> Value {
-        Value::Bool(*expr)
+    fn visit_bool_literal(&self, expr: bool) -> Value {
+        Value::Bool(expr)
     }
 }

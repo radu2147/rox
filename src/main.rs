@@ -46,7 +46,7 @@ fn run(code: String, env: &mut Environment) {
     let mut resolver = Resolver::new(&mut interpreter);
     match parser.parse_program() {
         Ok(mut t) => match resolver.resolve(env, &mut t) {
-            Ok(()) => match interpreter.interpret(&mut t, env) {
+            Ok(()) => match interpreter.interpret(t, env) {
                 Ok(_) => {}
                 Err(e) => {
                     log_error!(copy_code, e, e.from, e.to);
@@ -83,7 +83,7 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     let mut environment = Environment::new();
     environment.define(
-        "clock",
+        "clock".to_string(),
         Value::Callable(Callable {
             arity: 0,
             params: vec![],

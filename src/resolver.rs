@@ -24,14 +24,14 @@ pub struct Resolver<'a> {
     location: Location,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum FunctionType {
     None,
     Function,
     Method,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum ClassType {
     None,
     This,
@@ -56,7 +56,7 @@ impl<'a> Resolver<'a> {
         stmts: &mut Vec<Statement>,
     ) -> Result<(), ResolverError> {
         for stmt in stmts {
-            stmt.accept(self, env)?;
+            stmt.accept_ref(self, env)?;
         }
 
         Ok(())
@@ -68,16 +68,16 @@ impl<'a> Resolver<'a> {
         env: &mut Environment,
         typ: FunctionType,
     ) -> Result<(), ResolverError> {
-        let enc_fun = self.current_function.clone();
+        let enc_fun = self.current_function;
         self.current_function = typ;
 
         self.begin_scope();
         for param in &mut func_dec.params {
             self.declare(param.get_name());
             self.define(param.get_name());
-            param.accept(self, env)?;
+            param.accept_ref(self, env)?;
         }
-        func_dec.body.accept(self, env)?;
+        func_dec.body.accept_ref(self, env)?;
         self.end_scope();
 
         self.current_function = enc_fun;
@@ -152,9 +152,9 @@ impl Visitor<(), ResolverError> for Resolver<'_> {
         expr: &mut CallExpression,
         env: &mut Environment,
     ) -> Result<(), ResolverError> {
-        expr.callee.accept(self, env)?;
+        expr.callee.accept_ref(self, env)?;
         for arg in &mut expr.arguments {
-            arg.accept(self, env)?;
+            arg.accept_ref(self, env)?;
         }
         Ok(())
     }
@@ -164,7 +164,7 @@ impl Visitor<(), ResolverError> for Resolver<'_> {
         expr: &mut MemberExpression,
         env: &mut Environment,
     ) -> Result<(), ResolverError> {
-        expr.object.accept(self, env)?;
+        expr.object.accept_ref(self, env)?;
         Ok(())
     }
 
@@ -173,7 +173,7 @@ impl Visitor<(), ResolverError> for Resolver<'_> {
         expr: &mut AssignmentExpression,
         env: &mut Environment,
     ) -> Result<(), ResolverError> {
-        expr.asignee.accept(self, env)?;
+        expr.asignee.accept_ref(self, env)?;
         self.resolve_local(&expr.name);
         Ok(())
     }
@@ -183,8 +183,8 @@ impl Visitor<(), ResolverError> for Resolver<'_> {
         expr: &mut BinaryExpression,
         env: &mut Environment,
     ) -> Result<(), ResolverError> {
-        expr.left.accept(self, env)?;
-        expr.right.accept(self, env)?;
+        expr.left.accept_ref(self, env)?;
+        expr.right.accept_ref(self, env)?;
         Ok(())
     }
 
@@ -202,7 +202,7 @@ impl Visitor<(), ResolverError> for Resolver<'_> {
         expr: &mut UnaryExpression,
         env: &mut Environment,
     ) -> Result<(), ResolverError> {
-        expr.expression.accept(self, env)?;
+        expr.expression.accept_ref(self, env)?;
         Ok(())
     }
 
@@ -211,7 +211,7 @@ impl Visitor<(), ResolverError> for Resolver<'_> {
         expr: &mut GroupExpression,
         env: &mut Environment,
     ) -> Result<(), ResolverError> {
-        expr.expression.accept(self, env)?;
+        expr.expression.accept_ref(self, env)?;
         Ok(())
     }
 
@@ -248,7 +248,7 @@ impl StatementVisitor<(), ResolverError> for Resolver<'_> {
     ) -> Result<(), ResolverError> {
         self.declare(&class_declaration.name);
         self.define(&class_declaration.name);
-        let typ = self.current_type.clone();
+        let typ = self.current_type;
         self.current_type = ClassType::This;
         self.begin_scope();
 
@@ -258,7 +258,7 @@ impl StatementVisitor<(), ResolverError> for Resolver<'_> {
         for var in &mut class_declaration.fields {
             if let Stmt::VarDeclarationStatement(func_dec) = &mut var.typ {
                 self.declare(&func_dec.name);
-                func_dec.initializer.accept(self, env)?;
+                func_dec.initializer.accept_ref(self, env)?;
                 self.define(&func_dec.name);
             }
         }
@@ -278,11 +278,11 @@ impl StatementVisitor<(), ResolverError> for Resolver<'_> {
         if_statement: &mut IfStatement,
         env: &mut Environment,
     ) -> Result<(), ResolverError> {
-        if_statement.expression.accept(self, env)?;
-        if_statement.statement.accept(self, env)?;
+        if_statement.expression.accept_ref(self, env)?;
+        if_statement.statement.accept_ref(self, env)?;
         match &mut if_statement.else_statement {
             None => {}
-            Some(else_stmt) => else_stmt.accept(self, env)?,
+            Some(else_stmt) => else_stmt.accept_ref(self, env)?,
         }
 
         Ok(())
@@ -313,7 +313,7 @@ impl StatementVisitor<(), ResolverError> for Resolver<'_> {
         }
         match &mut return_stmt.return_expression {
             Some(rt_expr) => {
-                rt_expr.accept(self, env)?;
+                rt_expr.accept_ref(self, env)?;
             }
             None => {}
         }
@@ -327,8 +327,8 @@ impl StatementVisitor<(), ResolverError> for Resolver<'_> {
     ) -> Result<(), ResolverError> {
         let init = self.is_loop;
         self.is_loop = true;
-        while_statement.expression.accept(self, env)?;
-        while_statement.statement.accept(self, env)?;
+        while_statement.expression.accept_ref(self, env)?;
+        while_statement.statement.accept_ref(self, env)?;
         self.is_loop = init;
         Ok(())
     }
@@ -339,7 +339,7 @@ impl StatementVisitor<(), ResolverError> for Resolver<'_> {
         env: &mut Environment,
     ) -> Result<(), ResolverError> {
         self.declare(&decl.name);
-        decl.initializer.accept(self, env)?;
+        decl.initializer.accept_ref(self, env)?;
         self.define(&decl.name);
         Ok(())
     }
@@ -351,7 +351,7 @@ impl StatementVisitor<(), ResolverError> for Resolver<'_> {
     ) -> Result<(), ResolverError> {
         self.begin_scope();
         for stmt in &mut decl.statements {
-            stmt.accept(self, env)?;
+            stmt.accept_ref(self, env)?;
         }
         self.end_scope();
         Ok(())
@@ -362,7 +362,7 @@ impl StatementVisitor<(), ResolverError> for Resolver<'_> {
         expr: &mut ExpressionStatement,
         env: &mut Environment,
     ) -> Result<(), ResolverError> {
-        expr.expression.accept(self, env)?;
+        expr.expression.accept_ref(self, env)?;
         Ok(())
     }
 
@@ -371,7 +371,7 @@ impl StatementVisitor<(), ResolverError> for Resolver<'_> {
         expr: &mut PrintStatement,
         env: &mut Environment,
     ) -> Result<(), ResolverError> {
-        expr.expression.accept(self, env)?;
+        expr.expression.accept_ref(self, env)?;
         Ok(())
     }
 }
