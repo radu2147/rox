@@ -14,6 +14,7 @@ use rox_parser::Parser;
 use std::collections::HashMap;
 use std::env;
 use std::fs;
+use std::process::exit;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn run(code: String, env: Environment) {
@@ -55,8 +56,18 @@ fn run(code: String, env: Environment) {
 }
 
 fn run_file(filename: &String, env: Environment) {
-    let contents = fs::read_to_string(filename).expect("Should have been able to read the file");
-    run(contents, env);
+    if !filename.ends_with(".rox") {
+        println!("File should end in .rox");
+        exit(1);
+    }
+    match fs::read_to_string(filename) {
+        Ok(contents) => {
+            run(contents, env);
+        }
+        Err(e) => {
+            println!("{}", e)
+        }
+    }
 }
 
 fn main() {
