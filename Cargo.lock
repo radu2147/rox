@@ -52,6 +52,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "rox"
+version = "0.1.0"
+dependencies = [
+ "rox-errors",
+ "rox-interpreter",
+ "rox-parser",
+ "uuid",
+]
+
+[[package]]
 name = "rox-errors"
 version = "0.1.0"
 dependencies = [
@@ -71,16 +81,6 @@ name = "rox-parser"
 version = "0.1.0"
 dependencies = [
  "rox-errors",
- "uuid",
-]
-
-[[package]]
-name = "simba"
-version = "0.1.0"
-dependencies = [
- "rox-errors",
- "rox-interpreter",
- "rox-parser",
  "uuid",
 ]
 
