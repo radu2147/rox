@@ -93,7 +93,7 @@ impl<'a> Resolver<'a> {
         if self.ln == 0 {
             return;
         }
-        let mut scope = self.scopes.get_mut(self.ln - 1).unwrap();
+        let scope = self.scopes.get_mut(self.ln - 1).unwrap();
         scope.insert(lexeme.to_string(), false);
     }
 
@@ -101,7 +101,7 @@ impl<'a> Resolver<'a> {
         if self.ln == 0 {
             return;
         }
-        let mut scope = self.scopes.get_mut(self.ln - 1).unwrap();
+        let scope = self.scopes.get_mut(self.ln - 1).unwrap();
         scope.entry(lexeme.to_string()).and_modify(|v| *v = true);
     }
 

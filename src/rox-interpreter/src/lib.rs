@@ -19,7 +19,6 @@ use rox_parser::statement::{
 };
 use rox_parser::token::{Location, Token, VariableToken};
 use std::collections::HashMap;
-use std::fmt::Display;
 use std::ops::Add;
 use crate::value::{Callable, RoxClass, Value};
 
@@ -33,7 +32,7 @@ pub struct Interpreter {
 
 impl Interpreter {
     pub fn interpret(&mut self, stmts: Vec<Statement>) -> Result<(), RunTimeError> {
-        for mut stmt in stmts {
+        for stmt in stmts {
             stmt.accept::<Self, (), RunTimeError>(self)?;
         }
         Ok(())
@@ -169,9 +168,9 @@ impl OwnedStatementVisitor<(), RunTimeError> for Interpreter {
 
     fn visit_block_statement(&mut self, decl: BlockStatement) -> Result<(), RunTimeError> {
         let copy = self.environment.clone();
-        let mut child_env = self.environment.extend();
+        let child_env = self.environment.extend();
         self.environment = child_env;
-        for mut stmt in decl.statements {
+        for stmt in decl.statements {
             stmt.accept(self)?;
         }
         self.environment = copy;

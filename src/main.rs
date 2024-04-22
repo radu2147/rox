@@ -18,7 +18,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 fn run(code: String, env: Environment) {
     let copy_code = code.clone();
-    let mut scanner = Scanner::new(code.clone());
+    let scanner = Scanner::new(code.clone());
     let mut parser;
     match scanner.scan_tokens() {
         Ok(tokens) => {
@@ -69,12 +69,12 @@ fn main() {
             params: vec![],
             body: None,
             std_call: Some(|_int, _args| {
-                return Ok(Value::Number(
+                Ok(Value::Number(
                     SystemTime::now()
                         .duration_since(UNIX_EPOCH)
                         .unwrap()
                         .as_secs_f32(),
-                ));
+                ))
             }),
             closure: environment.clone(),
         }),

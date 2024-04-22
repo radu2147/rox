@@ -26,7 +26,6 @@ pub struct RoxClass {
 
 #[derive(Debug, Clone)]
 pub struct RoxClassInstance {
-    fields: HashMap<String, Value>,
     pub(crate) class: RoxClass,
 }
 
@@ -58,7 +57,6 @@ impl RoxClass {
                 );
             }
             let instance = RoxClassInstance {
-                fields: HashMap::new(),
                 class: end_class,
             };
             init_method
@@ -68,7 +66,6 @@ impl RoxClass {
             return Ok(Value::Instance(instance));
         }
         Ok(Value::Instance(RoxClassInstance {
-            fields: HashMap::new(),
             class: self.clone(),
         }))
     }

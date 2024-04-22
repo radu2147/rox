@@ -26,10 +26,6 @@ impl EnvNode {
         }
     }
 
-    fn get(&self, key: &str) -> Option<Value> {
-        self.map.get(key).map(Clone::clone)
-    }
-
     fn set(&mut self, key: String, value: Value) {
         self.map.insert(key.to_owned(), value);
     }
