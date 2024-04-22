@@ -6,7 +6,7 @@ use rox_errors::log_error;
 use rox_errors::InterpreterError;
 use rox_interpreter::environment::Environment;
 use rox_interpreter::resolver::Resolver;
-use rox_interpreter::value::{Callable, Value};
+use rox_interpreter::value::{Callable, FunctionBody, Value};
 use rox_interpreter::Interpreter;
 use rox_parser::scanner::Scanner;
 use rox_parser::token::Location;
@@ -67,8 +67,7 @@ fn main() {
         Value::Callable(Callable {
             arity: 0,
             params: vec![],
-            body: None,
-            std_call: Some(|_int, _args| {
+            body: FunctionBody::StdCall(|_int, _args| {
                 Ok(Value::Number(
                     SystemTime::now()
                         .duration_since(UNIX_EPOCH)

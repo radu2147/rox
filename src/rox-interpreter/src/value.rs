@@ -72,13 +72,17 @@ impl RoxClass {
 }
 
 #[derive(Debug, Clone)]
+pub enum FunctionBody {
+    StdCall(fn(int: &mut Interpreter, args: Vec<Value>) -> Result<Value, RunTimeError>),
+    Body(Statement)
+}
+
+#[derive(Debug, Clone)]
 pub struct Callable {
     pub arity: u8,
-    pub body: Option<Statement>,
+    pub body: FunctionBody,
     pub params: Vec<Expression>,
     pub closure: Environment,
-    pub std_call:
-    Option<fn(int: &mut Interpreter, args: Vec<Value>) -> Result<Value, RunTimeError>>,
 }
 
 impl Callable {
@@ -90,12 +94,11 @@ impl Callable {
             body: self.body.clone(),
             params: self.params.clone(),
             closure: env,
-            std_call: self.std_call,
         }
     }
     pub fn call(&mut self, int: &mut Interpreter, args: Vec<Value>) -> Result<Value, RunTimeError> {
         match self.body {
-            Some(ref mut bd) => {
+            FunctionBody::Body(ref mut bd) => {
                 let mut env = self.closure.extend();
                 for (ind, it) in args.into_iter().enumerate() {
                     env.define(self.params[ind].get_identifier_name().to_string(), it);
@@ -117,20 +120,16 @@ impl Callable {
                     }
                 }
             }
-            None => {
-                return match self.std_call {
-                    Some(fun) => Ok(fun(int, args)?),
-                    None => Ok(Value::Nil),
-                }
+            FunctionBody::StdCall(fun) => {
+                Ok(fun(int, args)?)
             }
         }
     }
     pub fn from_node(func_params: Vec<Expression>, func_body: Statement, env: Environment) -> Self {
         Self {
             arity: func_params.len() as u8,
-            body: Some(func_body),
+            body: FunctionBody::Body(func_body),
             params: func_params,
-            std_call: None,
             closure: env,
         }
     }
